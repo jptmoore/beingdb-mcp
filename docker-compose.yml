@@ -1,0 +1,55 @@
+services:
+  # BeingDB itself: serves the pack store compiled with BeingDB's native
+  # CLI (beingdb-compile) into ./pack_store. Assumes a sibling checkout at
+  # ../beingdb (https://github.com/jptmoore/beingdb) -- point `context` at
+  # your own checkout if it lives elsewhere.
+  beingdb:
+    build:
+      context: ../beingdb
+    volumes:
+      - ./pack_store:/data/pack_store
+    environment:
+      SNAPSHOT_PATH: /data/pack_store
+      PORT: 8080
+      MAX_RESULTS: 5000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 2s
+    restart: unless-stopped
+
+  # beingdb-mcp, speaking MCP over Streamable HTTP. Not published directly --
+  # only reachable through `nginx` below (see the /mcp location there).
+  mcp:
+    build: .
+    environment:
+      BEINGDB_URL: http://beingdb:8080
+      PORT: 3000
+    depends_on:
+      beingdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 2s
+    restart: unless-stopped
+
+  # Reverse proxy in front of both beingdb (REST) and mcp (MCP), for rate
+  # limiting/TLS-termination/safety -- put this behind your own Apache vhost.
+  # BeingDB REST: http://<host>:8090/...  MCP: http://<host>:8090/mcp
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8090:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      beingdb:
+        condition: service_healthy
+      mcp:
+        condition: service_healthy
+    restart: unless-stopped

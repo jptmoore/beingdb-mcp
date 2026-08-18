@@ -1,0 +1,39 @@
+{
+  "name": "beingdb-mcp",
+  "version": "0.1.0",
+  "description": "A thin, transparent Model Context Protocol (MCP) server exposing BeingDB's own query DSL to MCP-capable LLMs.",
+  "type": "module",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "bin": {
+    "beingdb-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "inspect": "npx -y @modelcontextprotocol/inspector",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run test/integration.test.ts",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "fixture:build": "./scripts/setup-local-beingdb.sh",
+    "fixture:serve": "\"${BEINGDB_REPO:-$HOME/git/beingdb}\"/_build/default/bin/serve.exe --pack ./.local/pack_store --port 8080"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
