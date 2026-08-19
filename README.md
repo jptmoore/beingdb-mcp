@@ -7,16 +7,6 @@ into queries itself: the connected LLM discovers BeingDB's predicates, writes th
 and `beingdb-mcp` validates/executes it through BeingDB and returns the results, with
 the exact query it ran always included for transparency.
 
-## Getting started
-
-```bash
-# 1. Compile your facts into ./pack_store using BeingDB's native CLI
-#    (beingdb-compile --git ./git_store --pack ./pack_store)
-
-# 2. Start everything: BeingDB, beingdb-mcp, and an nginx reverse proxy in front of both
-docker compose up -d
-```
-
 ## Try it
 
 In VS Code, open the Command Palette, run `MCP: Open User Configuration`, and add the
@@ -32,6 +22,8 @@ BeingDB connector to your MCP server configuration:
     }
 }
 ```
+
+The server uses the [BeingDB Rewind Interviews dataset](https://github.com/jptmoore/beingdb-rewind-interviews).
 
 ## Prompting
 
