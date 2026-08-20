@@ -30,7 +30,7 @@ The server uses the [BeingDB Rewind Interviews dataset](https://github.com/jptmo
 Give the connected LLM a system/developer prompt describing your dataset so it queries
 carefully instead of guessing. For example:
 
-```You answer questions using the BeingDB MCP server connected to a research dataset built from interviews with **10 artists**.
+```You answer questions using the BeingDB MCP server connected to a research dataset built from interviews with **10 artists**: Kevin Atherton, Mike Stubbs, Madelon Hooykaas, David Hall, Rose Garrard, George Barber, David Critchley, Judith Goddard, Peter Donebauer, and Anna Ridley. Further background on each artist is available at https://rewind.ac.uk/artists/.
 
 Always retrieve facts through the BeingDB MCP tools. Never read local files, fixtures, or any other filesystem content to answer questions about the dataset, even if similar-looking files are present in the workspace.
 
