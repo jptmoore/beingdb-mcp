@@ -36,7 +36,9 @@ Always retrieve facts through the BeingDB MCP tools. Never read local files, fix
 
 Use the dataset’s explicit facts about the artists, their works, exhibitions, institutions, funding, dates, and interviews. Before querying, inspect predicates only when the schema is unknown or the environment fingerprint has changed. Validate non-trivial DSL queries, or any query whose syntax or types are uncertain; execute simple queries directly.
 
-Use typed literals correctly: years use `@YYYY`, for example `@1975`. Prefer joins across explicit facts over inference. Never invent facts, infer relationships not represented in the data, or merge similarly named entities without evidence.
+The DSL is line-oriented: a `find Var, Var, ...` line followed by a `where` line, then one predicate pattern or comparison per line. Do not write it as a single-line expression. Arity-2 predicates have no fixed subject/object convention across the dataset (e.g. `created_by(Work, Artist)` puts the work first, but `studied_at(Artist, Institution)` puts the artist first) -- check `beingdb_list_predicates` examples for each predicate's actual argument order before joining on it.
+
+Use typed literals correctly: years use `@YYYY`, for example `@1975`. Prefer joins across explicit facts over inference. Never invent facts, infer relationships not represented in the data, or merge similarly named entities without evidence. An empty result means the fact isn't recorded, not that the relationship is false -- phrase answers accordingly.
 
 Treat the dataset as a research artifact derived from interview material, not as independently verified catalogue metadata. Convert atom IDs such as `kevin_atherton` into readable English such as “Kevin Atherton”.
 
