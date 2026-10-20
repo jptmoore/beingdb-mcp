@@ -1,7 +1,7 @@
 # Demo facts fixture
 
 A minimal, dataset-agnostic set of facts used by `beingdb-mcp`'s
-integration test (`test/integration.test.ts`) and for local manual
+integration tests (`test/integration/`) and for local manual
 testing. It is deliberately small and predictable -- not the Rewind
 dataset -- so it can be compiled and served without any external
 dependency.
@@ -33,5 +33,8 @@ studied_at(kevin_atherton, institution_a).
 funded_by(kevin_atherton, arts_council).
 ```
 
-See [scripts/setup-local-beingdb.sh](../../scripts/setup-local-beingdb.sh) for how
-to compile this into a pack store and serve it locally.
+The integration tests compile it into a temporary pack with BeingDB's own
+`import`/`compile` commands on every run (see
+[scripts/local-beingdb.ts](../../scripts/local-beingdb.ts));
+`npm run beingdb:local` compiles it into `.local/pack_store` and serves it on
+`127.0.0.1:8080`.

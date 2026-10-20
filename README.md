@@ -7,10 +7,10 @@ into queries itself: the connected LLM discovers BeingDB's predicates, writes th
 and `beingdb-mcp` validates/executes it through BeingDB and returns the results, with
 the exact query it ran always included for transparency.
 
-## Try it
+## Try the hosted demo
 
-In VS Code, open the Command Palette, run `MCP: Open User Configuration`, and add the
-BeingDB connector to your MCP server configuration:
+A public instance serves the [BeingDB Rewind Interviews dataset](https://github.com/jptmoore/beingdb-rewind-interviews).
+In VS Code, open the Command Palette, run `MCP: Open User Configuration`, and add:
 
 ```json
 {
@@ -23,7 +23,8 @@ BeingDB connector to your MCP server configuration:
 }
 ```
 
-The server uses the [BeingDB Rewind Interviews dataset](https://github.com/jptmoore/beingdb-rewind-interviews).
+The demo is optional: development and tests use a local BeingDB (see
+[Development](#development)).
 
 ## Tools
 
@@ -59,18 +60,78 @@ by BeingDB itself (see its [diagnose documentation](https://github.com/jptmoore/
 `repair.query`. `beingdb_diagnose_query` needs a BeingDB with the `diagnose`
 action; older servers return an `unknown_action` tool error.
 
-## Run locally
+## Development
 
-```bash
-npm install && npm run build
-npm run fixture:build                 # compile fixtures/demo-facts with ~/git/beingdb
-npm run fixture:serve                 # BeingDB on :8080
-BEINGDB_URL=http://localhost:8080 PORT=3000 npm start   # MCP at http://localhost:3000/mcp
+Everything runs against a local BeingDB; no deployed server or network access is
+needed (beyond installing dependencies).
+
+Prerequisites: Node.js 18.17+, and a [BeingDB](https://github.com/jptmoore/beingdb)
+checkout with its OCaml toolchain (`opam`/`dune`), next to this repository:
+
+```
+git/
+  beingdb/
+  beingdb-mcp/
 ```
 
-`npm test` runs the unit tests; with BeingDB serving the fixture,
-`BEINGDB_INTEGRATION_URL=http://localhost:8080 npm run test:integration` checks
-the MCP output against BeingDB's own HTTP responses.
+```bash
+npm install
+npm test
+```
+
+`npm test` runs the unit tests and the local integration tests. The integration
+suite builds BeingDB incrementally (`dune build`), compiles
+[fixtures/demo-facts](fixtures/demo-facts) into a temporary pack with BeingDB's own
+`import`/`compile` commands, starts one `beingdb-serve` on a free `127.0.0.1` port,
+runs the real MCP server against it, and stops both afterwards, even when tests fail.
+Server output goes to `.local/logs/`.
+
+BeingDB is found from, in order:
+
+| Setting | Meaning |
+|---|---|
+| `BEINGDB_BIN_DIR` | Directory with prebuilt `beingdb-import`/`beingdb-compile`/`beingdb-serve` (not rebuilt) |
+| `BEINGDB_REPO` | A BeingDB checkout, built with `dune` (or `opam exec -- dune`) |
+| `../beingdb` | A sibling checkout, built the same way |
+
+| Command | Runs |
+|---|---|
+| `npm test` | Unit + local integration tests |
+| `npm run test:unit` | Unit tests only (no BeingDB needed) |
+| `npm run test:integration` | Local integration tests only |
+| `npm run test:remote` | Optional deployment smoke test (below) |
+| `npm run beingdb:local` | BeingDB on `127.0.0.1:8080` serving the demo fixture (`-- --port N`, `-- --pack DIR` for another pack) |
+| `npm run dev` | The MCP server from source on port 3000 |
+
+To run the MCP server by hand against local BeingDB:
+
+```bash
+npm run beingdb:local     # terminal 1
+npm run dev               # terminal 2: MCP at http://127.0.0.1:3000/mcp
+```
+
+`npm run inspect` opens the MCP Inspector for interactive testing.
+
+### Configuration
+
+`BEINGDB_URL` sets the BeingDB instance, local or remote (default
+`http://127.0.0.1:8080`, the `beingdb:local` server); `PORT` (default 3000) and
+`HOST` (default `0.0.0.0`) set where MCP listens. There is no fallback to any other
+endpoint: if BeingDB is unreachable, tool calls fail with `connection_failed` naming
+the URL.
+
+### Deployment smoke test
+
+To check a deployed MCP endpoint (and the BeingDB behind it), run:
+
+```bash
+BEINGDB_MCP_REMOTE_URL=https://<host>/mcp npm run test:remote
+```
+
+It only checks that the tool surface is current and that schema, diagnose and
+execute respond; it makes no assertions about the dataset and is never part of
+`npm test`. `docker compose up -d --build` runs the deployment stack (BeingDB from
+`../beingdb`, the MCP server and nginx; MCP at `http://<host>:8090/mcp`).
 
 ## Prompting
 

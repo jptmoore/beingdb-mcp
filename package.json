@@ -20,11 +20,12 @@
     "start": "node dist/index.js",
     "inspect": "npx -y @modelcontextprotocol/inspector",
     "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:remote": "vitest run --config vitest.remote.config.ts",
     "test:watch": "vitest",
-    "test:integration": "vitest run test/integration.test.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "fixture:build": "./scripts/setup-local-beingdb.sh",
-    "fixture:serve": "\"${BEINGDB_REPO:-$HOME/git/beingdb}\"/_build/default/bin/serve.exe --pack ./.local/pack_store --port 8080"
+    "beingdb:local": "tsx scripts/local-beingdb.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

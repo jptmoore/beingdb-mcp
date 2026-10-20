@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
-import { BeingDbClient } from "../src/beingdb-client.js";
-import { createBeingDbMcpServer } from "../src/server.js";
+import { BeingDbClient } from "../../src/beingdb-client.js";
+import { createBeingDbMcpServer } from "../../src/server.js";
 
 function fakeResponse(status: number, body: unknown): Response {
   return { status, text: async () => JSON.stringify(body) } as Response;
@@ -80,7 +80,7 @@ describe("beingdb-mcp server", () => {
   });
 
   it("advertises the package.json version", async () => {
-    const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+    const pkg = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
     expect(client.getServerVersion()).toEqual({ name: "beingdb-mcp", version: pkg.version });
   });
 
@@ -206,10 +206,11 @@ describe("beingdb-mcp server", () => {
       expect(parseToolText(result as never)).toEqual(canonical);
 
       const created = (result.structuredContent as typeof canonical).predicates.find((p) => p.name === "created")!;
+      const args = created.arguments as Array<{ role?: string; semanticType?: string }>;
       expect(created.arity).toBe(2);
       expect(created.description).toBe("Relates an artist to a work they created.");
-      expect(created.arguments.map((a) => a.role)).toEqual(["Artist", "Work"]);
-      expect(created.arguments.map((a) => a.semanticType)).toEqual(["person", "work"]);
+      expect(args.map((a) => a.role)).toEqual(["Artist", "Work"]);
+      expect(args.map((a) => a.semanticType)).toEqual(["person", "work"]);
     });
 
     it("does not fabricate descriptions, roles or semantic types BeingDB omits", async () => {

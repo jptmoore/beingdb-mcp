@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BeingDbClient } from "../src/beingdb-client.js";
-import { BeingDbError } from "../src/types.js";
+import { BeingDbClient } from "../../src/beingdb-client.js";
+import { BeingDbError } from "../../src/types.js";
 
 function fakeResponse(status: number, body: unknown): Response {
   return {
