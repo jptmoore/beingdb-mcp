@@ -5,7 +5,7 @@
  * Deliberately short and not authoritative -- it summarizes syntax
  * documented in ~/git/beingdb/docs/query-language.md at the time this
  * file was written. Always confirm against a live instance with
- * `beingdb_validate_query` / `beingdb_explain_query`, since predicates,
+ * `beingdb_diagnose_query` / `beingdb_validate_query`, since predicates,
  * arities and argument types are dataset-specific and the DSL itself may
  * evolve.
  */
@@ -91,8 +91,13 @@ limit 20
 
 ## Workflow
 
-1. \`beingdb_list_predicates\` to discover real predicate names, arities and argument types.
+1. \`beingdb_list_predicates\` (\`detailed: true\` or \`names\`) to discover real predicate
+   names, arities, argument types and any declared descriptions and argument roles.
+   Argument \`position\`s are 0-based; declared roles give each argument's meaning.
 2. Construct DSL using only predicates that were actually discovered.
-3. \`beingdb_validate_query\` (and optionally \`beingdb_explain_query\`) before executing non-trivial queries.
+3. \`beingdb_diagnose_query\` before executing non-trivial queries: validation plus
+   data-aware diagnostics (\`provablyEmpty\`, per-diagnostic \`code\`/\`severity\`/\`evidence\`)
+   and, when BeingDB can prove one, a \`repair.query\` you may choose to run.
+   (\`beingdb_validate_query\` checks structure only; \`beingdb_explain_query\` shows the plan.)
 4. \`beingdb_query\` to execute and get typed, structured rows.
 `;

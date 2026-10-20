@@ -100,6 +100,46 @@ describe("BeingDbClient", () => {
     }
   });
 
+  it("treats `names` or `search` as implying detailed mode (BeingDB only filters detailed listings)", async () => {
+    fetchMock
+      .mockResolvedValueOnce(fakeResponse(200, { predicates: [], environmentFingerprint: "sha256:x", languageVersion: "beingdb-dsl/1" }))
+      .mockResolvedValueOnce(fakeResponse(200, { predicates: [], environmentFingerprint: "sha256:x", languageVersion: "beingdb-dsl/1" }));
+
+    const client = new BeingDbClient({ baseUrl: "http://localhost:8080" });
+    await client.listPredicates({ names: ["created"] });
+    await client.listPredicates({ search: "creat", samples: 5 });
+
+    const namesUrl = fetchMock.mock.calls[0]![0] as string;
+    expect(namesUrl).toContain("detailed=true");
+    expect(namesUrl).toContain("names=created");
+    const searchUrl = fetchMock.mock.calls[1]![0] as string;
+    expect(searchUrl).toContain("detailed=true");
+    expect(searchUrl).toContain("q=creat");
+    expect(searchUrl).not.toContain("samples=");
+  });
+
+  it("sends action=diagnose for DSL diagnosis and classifies valid:false diagnoses as invalid without throwing", async () => {
+    const body = {
+      valid: false,
+      errors: [{ code: "unknown_predicate", message: "Unknown predicate 'artst'; did you mean: artist?", line: 3, column: 3, predicate: "artst", suggestions: ["artist"] }],
+      warnings: [],
+      diagnostics: [],
+      provablyEmpty: false,
+      language: "dsl",
+      languageVersion: "beingdb-dsl/1",
+      environmentFingerprint: "sha256:abc",
+    };
+    fetchMock.mockResolvedValueOnce(fakeResponse(200, body));
+
+    const client = new BeingDbClient({ baseUrl: "http://localhost:8080" });
+    const outcome = await client.runQuery({ query: "find X\nwhere\n  artst(X)", language: "dsl", action: "diagnose" });
+
+    const sent = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(sent).toEqual({ query: "find X\nwhere\n  artst(X)", language: "dsl", action: "diagnose" });
+    expect(outcome.outcome).toBe("invalid");
+    expect(outcome.body).toEqual(body);
+  });
+
   it("ignores samples when detailed is set", async () => {
     fetchMock.mockResolvedValueOnce(fakeResponse(200, { predicates: [], environmentFingerprint: "sha256:x", languageVersion: "beingdb-dsl/1" }));
 

@@ -1,10 +1,11 @@
 /**
  * MCP server wiring: registers tools and resources on top of a
  * {@link BeingDbClient}. The MCP layer stays deliberately thin -- it does
- * not parse, validate, or reinterpret BeingDB query text; it forwards it
- * and returns BeingDB's own structured JSON, always alongside the exact
- * query text submitted (see the "transparency is first-class" design
- * goal).
+ * not parse, validate, diagnose, repair or reinterpret BeingDB query text,
+ * and it does not derive schema metadata; it forwards requests and returns
+ * BeingDB's own structured JSON (as MCP `structuredContent` plus the same
+ * JSON as text), always alongside the exact query text submitted (see the
+ * "transparency is first-class" design goal).
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -13,15 +14,35 @@ import type { BeingDbClient } from "./beingdb-client.js";
 import { BeingDbError } from "./types.js";
 import type { QueryLanguage, QueryOutcome } from "./types.js";
 import {
+  diagnoseInputShape,
+  diagnoseOutputSchema,
+  executeOutputSchema,
+  explainOutputSchema,
   getFactsInputShape,
+  getFactsOutputSchema,
   listPredicatesInputShape,
+  listPredicatesOutputSchema,
   queryInputShape,
+  statusOutputSchema,
   validateOrExplainInputShape,
+  validateOutputSchema,
 } from "./schemas.js";
 import { QUERY_LANGUAGE_REFERENCE } from "./query-language-reference.js";
 
+export const SERVER_VERSION = "0.2.0";
+
+/**
+ * Every tool returns BeingDB's JSON both as `structuredContent` (validated
+ * against the tool's `outputSchema`) and, for clients that only read
+ * `content`, as the identical serialised text. Error results carry text
+ * only, since they do not follow the tool's output schema.
+ */
 function jsonResult(body: unknown, isError = false): CallToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }], isError };
+  const result: CallToolResult = { content: [{ type: "text", text: JSON.stringify(body, null, 2) }], isError };
+  if (!isError && body !== null && typeof body === "object" && !Array.isArray(body)) {
+    result.structuredContent = body as Record<string, unknown>;
+  }
+  return result;
 }
 
 /** Uniform handling for any thrown {@link BeingDbError} (connection failures, timeouts, HTTP errors). */
@@ -54,7 +75,7 @@ function buildQueryToolResult(outcome: QueryOutcome, query: string, language: Qu
 export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
   const server = new McpServer({
     name: "beingdb-mcp",
-    version: "0.1.0",
+    version: SERVER_VERSION,
   });
 
   server.registerTool(
@@ -63,6 +84,7 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
       title: "BeingDB status",
       description:
         "Check connectivity to the configured BeingDB instance. Returns whether it is reachable, its URL, BeingDB version, DSL/language version, environment fingerprint, and predicate count. Mainly a connectivity/debugging tool -- use `beingdb_list_predicates` for vocabulary discovery.",
+      outputSchema: statusOutputSchema,
     },
     async (): Promise<CallToolResult> => {
       try {
@@ -79,8 +101,9 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "List BeingDB predicates",
       description:
-        "Inspect the dataset-specific vocabulary of the connected BeingDB instance: predicate names, arities, observed argument types, fact counts, bounded example facts, and the environment fingerprint. Predicate names are dataset-specific -- inspect this tool before constructing queries against an unfamiliar BeingDB instance, and do not invent predicates. Start broad (no arguments, or `detailed: true`) to discover the vocabulary, then narrow with `names` to inspect a handful of predicates in more detail once you know which ones matter.",
+        "Discover the connected dataset's schema before writing a query; predicate names are dataset-specific, so never invent them. With no arguments: names and arities only. With `detailed: true` (implied by `search` or `names`): per predicate, the fact `count`, `arguments` (0-based `position`, observed value `types`), `examples`, and -- only where the dataset author declared them in the BeingDB pack -- a `description` and per-argument `role` / `semanticType`. Declared descriptions and roles are authoritative schema metadata: use them to pick predicates and argument order. They are omitted, never guessed, when undeclared; then rely on `examples`. Also returns `environmentFingerprint` and `languageVersion` (refetch only when the fingerprint changes). Start broad, then narrow with `names`.",
       inputSchema: listPredicatesInputShape,
+      outputSchema: listPredicatesOutputSchema,
     },
     async (args): Promise<CallToolResult> => {
       try {
@@ -97,8 +120,9 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "Execute a BeingDB query",
       description:
-        'Execute a BeingDB query. Prefer the expressive BeingDB DSL (language: "dsl", the default). Before querying an unfamiliar BeingDB database, inspect its predicates using `beingdb_list_predicates`. Do not invent predicate names. Use `beingdb_validate_query` when uncertain about syntax, predicate arity, argument types or variable binding. The exact submitted query is returned with the results and may be shown to the user for transparency.',
+        'Execute a BeingDB query and return typed, structured rows. Prefer the expressive BeingDB DSL (language: "dsl", the default). Use only predicates discovered with `beingdb_list_predicates`. Normally execute a query only once it is valid: for non-trivial generated DSL, check it first with `beingdb_diagnose_query` (or `beingdb_validate_query`). An invalid query returns `valid: false` with structured `errors` instead of rows. The exact submitted query is returned with the results and may be shown to the user for transparency.',
       inputSchema: queryInputShape,
+      outputSchema: executeOutputSchema,
     },
     async (args): Promise<CallToolResult> => {
       try {
@@ -115,13 +139,33 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "Validate a BeingDB query",
       description:
-        "Validate a generated BeingDB DSL query without executing it. Use this when constructing non-trivial joins, optional clauses, negation, ordering or other expressive DSL features. Returns structured errors and warnings (e.g. unknown_predicate, arity_mismatch, disconnected_query, unsafe_negation) plus the language version and environment fingerprint. The exact submitted query remains visible even on validation failure.",
+        "Validate a BeingDB query (DSL or core) without executing it: syntax and structure against the schema only, with no checks against the data. Returns `valid` plus structured `errors` and `warnings` (e.g. unknown_predicate with suggestions, arity_mismatch, disconnected_query, unsafe_negation), the language version and environment fingerprint. For DSL queries, `beingdb_diagnose_query` returns the same validation plus data-aware diagnostics and proven repairs. The exact submitted query remains visible even on validation failure.",
       inputSchema: validateOrExplainInputShape,
+      outputSchema: validateOutputSchema,
     },
     async (args): Promise<CallToolResult> => {
       try {
         const outcome = await client.runQuery({ ...args, action: "validate" });
         return buildQueryToolResult(outcome, args.query, args.language);
+      } catch (err) {
+        return toolErrorResult(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "beingdb_diagnose_query",
+    {
+      title: "Diagnose a BeingDB DSL query",
+      description:
+        "Check a candidate DSL query against the actual data without executing it (BeingDB's `diagnose` action). Returns the same `valid` / `errors` / `warnings` as `beingdb_validate_query`, plus deterministic, data-grounded `diagnostics` from BeingDB (each with a `code`, `severity`, location and `evidence`) -- for example a constant that never occurs at that argument position, a join whose arguments share no value, or a variable named after a different argument's declared role. `provablyEmpty: true` means BeingDB proved the query as written returns no rows. When BeingDB can prove a correction it also returns `repair.query` (the rewritten query) and `repair.applied`: this is exact BeingDB output, not a guess, but it is never applied automatically -- run `repair.query` with `beingdb_query` (or diagnose it again) if it matches your intent. Recommended before executing non-trivial generated DSL. The exact submitted query is returned alongside the diagnosis.",
+      inputSchema: diagnoseInputShape,
+      outputSchema: diagnoseOutputSchema,
+    },
+    async (args): Promise<CallToolResult> => {
+      try {
+        const outcome = await client.runQuery({ query: args.query, language: "dsl", action: "diagnose" });
+        return buildQueryToolResult(outcome, args.query, "dsl");
       } catch (err) {
         return toolErrorResult(err);
       }
@@ -135,6 +179,7 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
       description:
         "Explain a BeingDB DSL query without executing it: returns the structured access plan (predicate scans, index lookups, joins, filters, projection, sort) and a human-readable plan summary. Useful for debugging and for exposing how a generated symbolic query will be evaluated, especially for more complicated generated DSL. The exact submitted query is returned alongside the explanation.",
       inputSchema: validateOrExplainInputShape,
+      outputSchema: explainOutputSchema,
     },
     async (args): Promise<CallToolResult> => {
       try {
@@ -153,6 +198,7 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
       description:
         "Retrieve every fact for a single named predicate directly, with no joins or filtering. Useful for quick inspection, tiny relations, debugging, or export. The preferred interface for meaningful retrieval and joins is `beingdb_query` using the BeingDB DSL -- this tool has no pagination and does not support multi-predicate queries.",
       inputSchema: getFactsInputShape,
+      outputSchema: getFactsOutputSchema,
     },
     async (args): Promise<CallToolResult> => {
       try {
@@ -170,7 +216,7 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "BeingDB schema",
       description:
-        "The connected BeingDB instance's current query environment: version, DSL language version, environment fingerprint, and every predicate's arity, fact count, observed argument types and bounded examples. Generated live from GET /predicates?detailed=true and GET /version -- refetch after the underlying dataset changes (watch environmentFingerprint).",
+        "The connected BeingDB instance's current query environment: version, DSL language version, environment fingerprint, and every predicate's arity, fact count, observed argument types, bounded examples and any declared description, argument roles and semantic types. Generated live from GET /predicates?detailed=true and GET /version -- refetch after the underlying dataset changes (watch environmentFingerprint).",
       mimeType: "application/json",
     },
     async (uri) => {
@@ -186,7 +232,7 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "BeingDB query language reference",
       description:
-        "Concise, LLM-oriented reference for BeingDB's DSL (find/where) syntax: clauses, joins, comparisons, optional/either-or/not, ordering, pagination, and literal types. Not authoritative or exhaustive -- use beingdb_validate_query and beingdb_explain_query for ground truth against the connected instance.",
+        "Concise, LLM-oriented reference for BeingDB's DSL (find/where) syntax: clauses, joins, comparisons, optional/either-or/not, ordering, pagination, and literal types. Not authoritative or exhaustive -- use beingdb_list_predicates, beingdb_diagnose_query and beingdb_validate_query for ground truth against the connected instance.",
       mimeType: "text/markdown",
     },
     async (uri) => {

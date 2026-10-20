@@ -8,7 +8,8 @@
  */
 
 export type QueryLanguage = "dsl" | "core";
-export type QueryAction = "execute" | "validate" | "explain";
+/** `"diagnose"` is DSL-only in BeingDB; the core language rejects it with `unknown_action`. */
+export type QueryAction = "execute" | "validate" | "explain" | "diagnose";
 
 /** A single typed BeingDB value, e.g. {"type":"atom","value":"tina_keane"}. */
 export interface BeingDbTypedValue {
@@ -36,15 +37,26 @@ export interface PredicatesSummaryResponse {
   samples_per_predicate?: number;
 }
 
+/**
+ * One argument of a predicate, as serialised by BeingDB's
+ * `Query_environment.to_json`. `position` is 0-based. `types` are always
+ * inferred from the facts; `role` and `semanticType` come only from an
+ * author declaration (`%! pred(Role:semantic_type, ...)`) in the pack and
+ * are omitted -- never defaulted -- when undeclared.
+ */
 export interface PredicateArgumentSignature {
   position: number;
   types: string[];
+  role?: string;
+  semanticType?: string;
 }
 
+/** `description` is omitted by BeingDB when the predicate has no declared description. */
 export interface PredicateDetailed {
   name: string;
   arity: number;
   count: number;
+  description?: string;
   arguments: PredicateArgumentSignature[];
   examples: BeingDbTypedValue[][];
 }
@@ -126,7 +138,57 @@ export interface QueryValidateOrExplainSuccess {
   planText?: string;
 }
 
-export type BeingDbSuccessBody = QueryExecuteSuccess | QueryValidateOrExplainSuccess;
+/**
+ * A repair BeingDB has proven (`Query_diagnostics.repair_to_json`), e.g.
+ * `{"kind":"swap_arguments","predicate":"created","line":3,"positions":[0,1]}`
+ * or `{"kind":"replace_variable",...,"argumentPosition":1,"variable":"X","value":{...}}`.
+ */
+export interface BeingDbRepairStep {
+  kind: string;
+  predicate?: string;
+  line?: number;
+  positions?: number[];
+  argumentPosition?: number;
+  variable?: string;
+  value?: BeingDbTypedValue;
+  [key: string]: unknown;
+}
+
+/** One data-aware diagnostic (`Query_diagnostics.to_json`); optional fields are omitted when unknown. */
+export interface BeingDbDiagnostic {
+  code: string;
+  severity: string;
+  message: string;
+  line?: number;
+  predicate?: string;
+  argumentPosition?: number;
+  variable?: string;
+  value?: BeingDbTypedValue;
+  scope?: string;
+  evidence?: Record<string, unknown>;
+  repair?: BeingDbRepairStep;
+  [key: string]: unknown;
+}
+
+/**
+ * `action: "diagnose"` response (DSL only). Always HTTP 200: `valid`,
+ * `errors` and `warnings` exactly as `validate` reports them, plus
+ * `diagnostics`, `provablyEmpty` and -- only when BeingDB proves one and
+ * it re-parses cleanly -- `repair`.
+ */
+export interface QueryDiagnoseResult {
+  valid: boolean;
+  errors: BeingDbValidationError[];
+  warnings: BeingDbValidationWarning[];
+  diagnostics: BeingDbDiagnostic[];
+  provablyEmpty: boolean;
+  repair?: { query: string; applied: BeingDbRepairStep[] };
+  language: QueryLanguage;
+  languageVersion: string;
+  environmentFingerprint: string;
+}
+
+export type BeingDbSuccessBody = QueryExecuteSuccess | QueryValidateOrExplainSuccess | QueryDiagnoseResult;
 
 /** A well-formed request whose *query* is invalid (`valid: false`), for any action/language. */
 export interface QueryInvalidResult {

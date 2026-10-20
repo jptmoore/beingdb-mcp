@@ -73,6 +73,20 @@ describeIfConfigured("beingdb-mcp integration (real BeingDB instance)", () => {
     serverProcess.kill();
   });
 
+  /** BeingDB's own HTTP response, for MCP-vs-native parity checks. */
+  async function native(path: string, body?: unknown): Promise<unknown> {
+    const res = await fetch(`${beingDbUrl}${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return res.json();
+  }
+
+  it("identifies itself with the package version", () => {
+    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.2.0" });
+  });
+
   it("reports a reachable status with version and environment fingerprint", async () => {
     const result = await client.callTool({ name: "beingdb_status", arguments: {} });
     expect(result.isError).toBeFalsy();
@@ -92,6 +106,96 @@ describeIfConfigured("beingdb-mcp integration (real BeingDB instance)", () => {
     const body = parseToolJson(result as never) as { predicates: Array<{ name: string; arity: number }> };
     const names = body.predicates.map((p) => p.name).sort();
     expect(names).toEqual(["artist", "created", "funded_by", "studied_at", "work_shown_in"]);
+  });
+
+  it("exposes BeingDB's canonical predicate introspection unchanged, including declarations", async () => {
+    const result = await client.callTool({ name: "beingdb_list_predicates", arguments: { detailed: true } });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual(await native("/predicates?detailed=true"));
+
+    type Predicate = { name: string; arity: number; description?: string; arguments: Array<Record<string, unknown>> };
+    const predicates = (result.structuredContent as { predicates: Predicate[] }).predicates;
+    const byName = (name: string) => predicates.find((p) => p.name === name)!;
+
+    // Declared in fixtures/demo-facts/predicates/created.pl: `%! created(Artist:person, Work:work)`.
+    expect(byName("created")).toMatchObject({
+      arity: 2,
+      description: "Relates an artist to a work they created.",
+      arguments: [
+        { position: 0, role: "Artist", semanticType: "person" },
+        { position: 1, role: "Work", semanticType: "work" },
+      ],
+    });
+    // Roles without semantic types.
+    expect(byName("work_shown_in").arguments.map((a) => [a.role, a.semanticType])).toEqual([
+      ["Work", undefined],
+      ["Exhibition", undefined],
+    ]);
+    // Description only, and wholly undeclared: nothing fabricated.
+    expect(byName("studied_at").arguments.some((a) => "role" in a)).toBe(false);
+    expect(byName("artist")).not.toHaveProperty("description");
+    expect(byName("funded_by")).not.toHaveProperty("description");
+    expect(byName("funded_by").arguments.some((a) => "role" in a || "semanticType" in a)).toBe(false);
+  });
+
+  it("returns BeingDB's own diagnostics and proven repair for a reversed constant, matching the native diagnose action", async () => {
+    const dslQuery = "find Work\nwhere\n  created(work_a, Work)";
+    const result = await client.callTool({ name: "beingdb_diagnose_query", arguments: { query: dslQuery } });
+    expect(result.isError).toBeFalsy();
+
+    const canonical = (await native("/query", { language: "dsl", action: "diagnose", query: dslQuery })) as Record<string, unknown>;
+    expect(result.structuredContent).toEqual({ query: dslQuery, ...canonical });
+
+    const body = result.structuredContent as {
+      valid: boolean;
+      provablyEmpty: boolean;
+      diagnostics: Array<{ code: string; severity: string; argumentPosition: number; evidence: { occursAtPositions: number[] }; repair?: unknown }>;
+      repair: { query: string; applied: Array<{ kind: string; positions: number[] }> };
+    };
+    expect(body.valid).toBe(true);
+    expect(body.provablyEmpty).toBe(true);
+    expect(body.diagnostics[0]).toMatchObject({
+      code: "constant_not_at_position",
+      severity: "error",
+      argumentPosition: 0,
+      evidence: { occursAtPositions: [1] },
+      repair: { kind: "swap_arguments", positions: [0, 1] },
+    });
+    expect(body.repair).toEqual({
+      query: "find Work\nwhere\n  created(Work, work_a)",
+      applied: [{ kind: "swap_arguments", predicate: "created", line: 3, positions: [0, 1] }],
+    });
+  });
+
+  it("follows the agent workflow: inspect schema, diagnose, apply BeingDB's proven repair, diagnose clean, execute", async () => {
+    // 1. Inspect the schema and pick the predicate relating artists to works by its declared roles.
+    const schema = await client.callTool({ name: "beingdb_list_predicates", arguments: { detailed: true } });
+    const predicates = (schema.structuredContent as { predicates: Array<{ name: string; arguments: Array<{ role?: string }> }> }).predicates;
+    const relation = predicates.find((p) => p.arguments.map((a) => a.role).join() === "Artist,Work");
+    expect(relation?.name).toBe("created");
+
+    // 2. A candidate query with the arguments the wrong way round.
+    const candidate = `find Artist\nwhere\n  ${relation!.name}(work_b, Artist)`;
+
+    // 3. Diagnose it.
+    const diagnosis = await client.callTool({ name: "beingdb_diagnose_query", arguments: { query: candidate } });
+    const report = diagnosis.structuredContent as { provablyEmpty: boolean; diagnostics: Array<{ code: string }>; repair?: { query: string } };
+
+    // 4. Inspect the diagnostics; the client (not MCP) decides to use the proven repair.
+    expect(report.provablyEmpty).toBe(true);
+    expect(report.diagnostics.map((d) => d.code)).toContain("constant_not_at_position");
+    expect(report.repair?.query).toBe("find Artist\nwhere\n  created(Artist, work_b)");
+    const repaired = report.repair!.query;
+
+    const recheck = await client.callTool({ name: "beingdb_diagnose_query", arguments: { query: repaired } });
+    expect(recheck.structuredContent).toMatchObject({ valid: true, provablyEmpty: false, diagnostics: [] });
+    expect(recheck.structuredContent).not.toHaveProperty("repair");
+
+    // 5. Execute the repaired, clean query.
+    const execution = await client.callTool({ name: "beingdb_query", arguments: { query: repaired } });
+    expect(execution.isError).toBeFalsy();
+    expect(execution.structuredContent).toEqual({ query: repaired, ...((await native("/query", { language: "dsl", action: "execute", query: repaired })) as object) });
+    expect((execution.structuredContent as { results: unknown[] }).results).toEqual([{ Artist: { type: "atom", value: "david_hall" } }]);
   });
 
   it("validates then executes a non-trivial DSL join across the demo-facts fixture, preserving the exact query", async () => {

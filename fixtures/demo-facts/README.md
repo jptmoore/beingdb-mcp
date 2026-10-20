@@ -12,7 +12,11 @@ where the artists studied, who funded them) without containing any
 Rewind-specific or otherwise dataset-specific logic in `beingdb-mcp`
 itself.
 
-Facts:
+Facts (`created`, `work_shown_in` and `studied_at` also carry BeingDB
+`%!` declarations -- full roles and semantic types, roles only, and a
+description only -- while `artist` and `funded_by` are left undeclared,
+so tests can check that MCP passes declared metadata through and
+fabricates none):
 
 ```
 artist(kevin_atherton).

@@ -106,9 +106,15 @@ export class BeingDbClient {
     return json as VersionInfo;
   }
 
+  /**
+   * `GET /predicates`. `search` and `names` are only honoured by BeingDB in
+   * detailed mode, so either one implies `detailed` (previously they were
+   * silently dropped, returning the unfiltered summary instead).
+   */
   async listPredicates(opts: ListPredicatesOptions = {}): Promise<PredicatesResponse> {
     const params = new URLSearchParams();
-    if (opts.detailed) {
+    const wantsFilter = opts.search !== undefined || (opts.names !== undefined && opts.names.length > 0);
+    if (opts.detailed || wantsFilter) {
       params.set("detailed", "true");
       if (opts.search) params.set("q", opts.search);
       if (opts.names && opts.names.length > 0) params.set("names", opts.names.join(","));
@@ -140,11 +146,12 @@ export class BeingDbClient {
   }
 
   /**
-   * `POST /query` -- execute, validate or explain a query in either
-   * language. Never throws for a query-invalid result or a structured
+   * `POST /query` -- execute, validate, explain or (DSL only) diagnose a
+   * query. Never throws for a query-invalid result or a structured
    * runtime failure (both come back as a {@link QueryOutcome}); only
    * throws {@link BeingDbError} for connection failures, timeouts, or a
-   * non-JSON response.
+   * non-JSON response. A `diagnose` body is always HTTP 200 from BeingDB;
+   * it is classified `invalid` when its `valid` field is `false`.
    */
   async runQuery(opts: RunQueryOptions): Promise<QueryOutcome> {
     const language = opts.language ?? "dsl";
