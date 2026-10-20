@@ -15,6 +15,9 @@
  *   1. BEINGDB_BIN_DIR  directory with beingdb-import/-compile/-serve (or import/compile/serve.exe); not built
  *   2. BEINGDB_REPO     a BeingDB checkout, built with dune
  *   3. ../beingdb       a sibling checkout of this repository, built with dune
+ *
+ * BEINGDB_OPAM_SWITCH pins the opam switch used to build (default: the
+ * shell's active switch).
  */
 import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
@@ -97,24 +100,36 @@ export function describeInstallation(inst: BeingDbInstallation): string {
 
 /**
  * Build the three executables with dune (incremental, so cheap when up to
- * date), falling back to `opam exec -- dune` when dune is not on PATH.
+ * date). With BEINGDB_OPAM_SWITCH set, builds with `opam exec --switch=<it>`
+ * regardless of the shell's active switch; otherwise uses `dune` from PATH,
+ * falling back to `opam exec -- dune` when dune is not on PATH.
  * Returns the command used, or why nothing was built.
  */
-export function buildBeingDb(inst: BeingDbInstallation): string {
+export function buildBeingDb(inst: BeingDbInstallation, env: NodeJS.ProcessEnv = process.env): string {
   if (!inst.repo) return "not built (prebuilt executables from BEINGDB_BIN_DIR)";
-  const attempts = [
-    ["dune", "build", ...BUILD_TARGETS],
-    ["opam", "exec", "--", "dune", "build", ...BUILD_TARGETS],
-  ];
+  const pinned = env.BEINGDB_OPAM_SWITCH;
+  const attempts = pinned
+    ? [["opam", "exec", `--switch=${pinned}`, "--", "dune", "build", ...BUILD_TARGETS]]
+    : [
+        ["dune", "build", ...BUILD_TARGETS],
+        ["opam", "exec", "--", "dune", "build", ...BUILD_TARGETS],
+      ];
   for (const [cmd, ...args] of attempts) {
-    const result = spawnSync(cmd!, args, { cwd: inst.repo, encoding: "utf8" });
-    if ((result.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") continue;
+    const result = spawnSync(cmd!, args, { cwd: inst.repo, encoding: "utf8", env });
+    if ((result.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT" && !pinned) continue;
     const command = `${[cmd, ...args].join(" ")}  (in ${inst.repo})`;
     if (result.status !== 0) {
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim() || result.error?.message || "";
+      const missing = /Library "([^"]+)" not found/.exec(output)?.[1];
       throw new LocalBeingDbError("build", "Building local BeingDB failed.", {
         repository: inst.repo,
         "build command": command,
-        output: `${result.stdout ?? ""}${result.stderr ?? ""}`.trim() || result.error?.message,
+        "opam switch": pinned ?? env.OPAM_SWITCH_PREFIX ?? "(none active)",
+        dune: pinned ? undefined : whichDune(env),
+        output,
+        fix: missing
+          ? `The OCaml library "${missing}" is not installed in this opam switch. Use the switch where BeingDB's dependencies are installed (eval "$(opam env --switch=<name> --set-switch)", or set BEINGDB_OPAM_SWITCH=<name>), or install them here with \`opam install . --deps-only\` in ${inst.repo}.`
+          : undefined,
       });
     }
     return command;
@@ -127,6 +142,11 @@ export function buildBeingDb(inst: BeingDbInstallation): string {
     "expected executable": inst.serveExe,
     fix: `Install OCaml/opam and run \`dune build\` in ${inst.repo}, or set BEINGDB_BIN_DIR.`,
   });
+}
+
+function whichDune(env: NodeJS.ProcessEnv): string | undefined {
+  const result = spawnSync("sh", ["-c", "command -v dune"], { encoding: "utf8", env });
+  return result.status === 0 ? result.stdout.trim() : undefined;
 }
 
 /** Import `fixtureDir` and compile it into `<workDir>/pack_store` (both stores are recreated). Returns the pack path. */

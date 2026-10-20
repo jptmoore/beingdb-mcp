@@ -47,6 +47,10 @@ it in the foreground. It is implemented in
 | `BEINGDB_REPO` | A BeingDB checkout, built with `dune` (or `opam exec -- dune` if `dune` is not on `PATH`) |
 | `../beingdb` | A sibling checkout, built the same way |
 
+BeingDB is built with your shell's active opam switch. Set
+`BEINGDB_OPAM_SWITCH=<name>` to always build with a specific switch instead (the one
+where BeingDB's dependencies are installed).
+
 ## Configuration
 
 | Variable | Default | Meaning |
@@ -81,6 +85,10 @@ the tests can check that declared metadata passes through and nothing is invente
   `BEINGDB_REPO` or `BEINGDB_BIN_DIR`.
 - **"Building local BeingDB failed" / "neither dune nor opam is on PATH"**: install
   BeingDB's OCaml toolchain, or run `eval "$(opam env)"` first.
+- **`Library "..." not found` while building**: the active opam switch (shown in the
+  error) lacks BeingDB's dependencies. Switch to the one that has them
+  (`eval "$(opam env --switch=<name> --set-switch)"`), set `BEINGDB_OPAM_SWITCH=<name>`,
+  or install them with `opam install . --deps-only` in the BeingDB checkout.
 - **"port 8080 is unavailable"**: something else is using it; use
   `npm run beingdb:local -- --port 18080` and `BEINGDB_URL=http://127.0.0.1:18080 npm run dev`.
 - **Tool calls fail with `connection_failed`**: BeingDB isn't running at the logged
