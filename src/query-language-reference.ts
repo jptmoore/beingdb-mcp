@@ -79,6 +79,13 @@ single typed value; \`_\` matches anything without binding.
 compatible types (integer/decimal/year promote narrowly toward each other;
 date, year-month and instant are never compared against unrelated types).
 
+\`Var contains "text"\` searches text: it keeps rows whose string, language-tagged
+string or atom value contains the text, ignoring case, with underscores and spaces
+treated alike (\`Title contains "video stairs"\` matches \`the_video_stairs\`). It is a
+plain substring test (no wildcards or regular expressions); the text must be quoted,
+1-200 characters. Use it to find entities whose exact atom you don't know, then use
+that atom.
+
 ## Example
 
 \`\`\`

@@ -119,6 +119,28 @@ carries the same `diagnostics` and `provablyEmpty` as an empty result, so a
 misspelled name is reported rather than answered as "0". Misuse, such as counting a
 variable that is also a `find` column, is rejected with `invalid_count`.
 
+## Text search
+
+From BeingDB 0.4.0 a query can search text with `Var contains "text"`:
+
+```
+find Exhibition, Title
+where
+  exhibition_title(Exhibition, Title)
+  Title contains "video"
+```
+
+It keeps rows whose string, language-tagged string or atom value contains the text,
+ignoring case, with underscores and spaces treated alike, so it also finds atoms such
+as `the_video_stairs`. It is a literal substring test: no wildcards or regular
+expressions. The text must be quoted and 1-200 characters, and the variable must hold
+text; otherwise BeingDB rejects the query with `invalid_contains`. If nothing
+contains the text, the empty result's `diagnostics` say so.
+
+`contains` cannot use an index, so it is cheapest next to clauses with constants. A
+query that would read more than BeingDB's `max_scanned_facts` fails with the tool
+error `scan_limit_exceeded`.
+
 ## Empty results
 
 When a DSL query's first page has no rows, `beingdb_query` also returns BeingDB's
