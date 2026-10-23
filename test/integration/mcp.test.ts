@@ -58,7 +58,7 @@ afterAll(async () => {
 
 describe("server identity and status", () => {
   it("identifies itself with the package version", () => {
-    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.6.0" });
+    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.7.0" });
   });
 
   it("reports the local BeingDB as reachable, with version and fingerprint", async () => {
@@ -200,6 +200,21 @@ describe("execute", () => {
     ]);
     expect(result.structuredContent).toMatchObject({ hasMore: false, truncated: false });
     expect(result.structuredContent).not.toHaveProperty("diagnostics");
+  });
+
+  it("searches text with contains, and rejects misuse with invalid_contains", async () => {
+    const dslQuery = 'find Artist, Work\nwhere\n  created(Artist, Work)\n  Work contains "WORK A"';
+    const result = await call("beingdb_query", { query: dslQuery });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual({ query: dslQuery, ...(await native("/query", { language: "dsl", action: "execute", query: dslQuery })) });
+    expect(result.structuredContent).toMatchObject({
+      results: [{ Artist: { type: "atom", value: "kevin_atherton" }, Work: { type: "atom", value: "work_a" } }],
+      total: 1,
+    });
+
+    const invalid = await call("beingdb_query", { query: 'find Work\nwhere\n  created(Artist, Work)\n  Work contains ""' });
+    expect(invalid.isError).toBeFalsy();
+    expect(invalid.structuredContent).toMatchObject({ valid: false, errors: [{ code: "invalid_contains" }] });
   });
 
   it("counts with count(Var), grouped by the other find variables, and explains a zero count", async () => {

@@ -1,6 +1,6 @@
 {
   "name": "beingdb-mcp",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A thin, transparent Model Context Protocol (MCP) server exposing BeingDB's own query DSL to MCP-capable LLMs.",
   "type": "module",
   "license": "MIT",
