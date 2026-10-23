@@ -58,7 +58,7 @@ afterAll(async () => {
 
 describe("server identity and status", () => {
   it("identifies itself with the package version", () => {
-    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.5.0" });
+    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.6.0" });
   });
 
   it("reports the local BeingDB as reachable, with version and fingerprint", async () => {
@@ -200,6 +200,28 @@ describe("execute", () => {
     ]);
     expect(result.structuredContent).toMatchObject({ hasMore: false, truncated: false });
     expect(result.structuredContent).not.toHaveProperty("diagnostics");
+  });
+
+  it("counts with count(Var), grouped by the other find variables, and explains a zero count", async () => {
+    const dslQuery = "find Artist, count(Work)\nwhere\n  created(Artist, Work)\norder by Artist";
+    const result = await call("beingdb_query", { query: dslQuery });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual({ query: dslQuery, ...(await native("/query", { language: "dsl", action: "execute", query: dslQuery })) });
+    expect(result.structuredContent).toMatchObject({
+      variables: ["Artist", "count(Work)"],
+      results: [
+        { Artist: { type: "atom", value: "david_hall" }, "count(Work)": { type: "integer", value: "1" } },
+        { Artist: { type: "atom", value: "kevin_atherton" }, "count(Work)": { type: "integer", value: "1" } },
+      ],
+      total: 2,
+    });
+
+    const zero = await call("beingdb_query", { query: "find count(Work)\nwhere\n  created(kevin_athertn, Work)" });
+    expect(zero.structuredContent).toMatchObject({
+      results: [{ "count(Work)": { type: "integer", value: "0" } }],
+      provablyEmpty: true,
+      diagnostics: [{ code: "unknown_constant" }],
+    });
   });
 
   it("explains an empty result with BeingDB's diagnostics, without a separate diagnose call", async () => {

@@ -17,7 +17,7 @@ projection, optional matches, disjunction, negation, ordering,
 deduplication and pagination.
 
 \`\`\`
-find [distinct] Var, Var, ...
+find [distinct] Var | count(Var), ...
 where
   <clause>
   <clause>
@@ -29,12 +29,17 @@ where
     <clause>*
   not
     <clause>*
-order by Var [ascending|descending], ...
+order by Var | count(Var) [ascending|descending], ...
 limit N
 offset N
 \`\`\`
 
 - \`find\` lists the variables to project, in order. \`distinct\` deduplicates rows.
+- \`count(Var)\` in \`find\` counts the distinct values of \`Var\`; the other \`find\`
+  variables are the groups (one row each), and with none there is a single row.
+  E.g. \`find Artist, count(Work)\` ... \`order by count(Work) descending\`. The
+  column (and result key) is \`count(Work)\`; values unbound by \`optional\` are not
+  counted, so a group can count 0. Use it for "how many" questions.
 - \`where\` lists clauses: predicate patterns (\`created(Artist, Work)\`), comparisons
   (\`Year >= 1970\`, \`Date between @2019-01-01 and @2019-12-31\`), or \`_\` wildcards.
 - \`optional\` is a left join -- variables only bound inside it come back as \`null\`
@@ -101,8 +106,9 @@ limit 20
    probably misspelled constant comes with \`evidence.suggestions\` (closest values that
    occur at that argument) -- hints, not proofs.
    (\`beingdb_validate_query\` checks structure only; \`beingdb_explain_query\` shows the plan.)
-4. \`beingdb_query\` to execute and get typed, structured rows. \`total\` is how many rows
-   the query matches (answer "how many" from it); \`hasMore: true\` means more
+4. \`beingdb_query\` to execute and get typed, structured rows. For "how many", use
+   \`count(Var)\` (distinct values, optionally per group); \`total\` is how many result
+   rows the query matches, which a join can duplicate. \`hasMore: true\` means more
    rows match (page with \`offset\`); \`truncated: true\` means the server's row cap cut the
    result, so the rows are not the complete answer. An empty DSL result carries
    BeingDB's \`diagnostics\` and \`provablyEmpty\`: \`true\` means fix the query, \`false\`

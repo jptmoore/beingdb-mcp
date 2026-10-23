@@ -87,8 +87,9 @@ BeingDB has one query language, the `find`/`where` DSL, so every query tool take
 just the query text; paging is `limit N` / `offset N` in that text. `beingdb_query`
 results carry a count and two flags from BeingDB:
 
-- `total`: how many rows the query matches, regardless of `limit`, `offset` or the
-  server's row cap. Answer "how many" questions from it rather than by counting rows.
+- `total`: how many result rows the query matches, regardless of `limit`, `offset`
+  or the server's row cap. Rows can repeat a value through joins, so for "how many"
+  questions prefer `count(Var)` (below).
 - `hasMore: true`: more rows match than were returned, because the query's own
   `limit` or the server's row cap stopped it. Fetch the next page with `offset N`
   in the query text.
@@ -98,6 +99,25 @@ results carry a count and two flags from BeingDB:
 
 `hasMore` and `truncated` need BeingDB 0.1.5 or later and `total` needs 0.2.0;
 older servers omit them.
+
+## Counting
+
+From BeingDB 0.3.0 a query can count: `count(Var)` in `find` counts the distinct
+values of `Var`, grouped by the other `find` variables.
+
+```
+find Artist, count(Work)
+where
+  created_by(Work, Artist)
+order by count(Work) descending
+limit 5
+```
+
+Each row has the group's values and a `count(Work)` column of type `integer`;
+`find count(Work) where ...` returns one row. A count of 0 because nothing matched
+carries the same `diagnostics` and `provablyEmpty` as an empty result, so a
+misspelled name is reported rather than answered as "0". Misuse, such as counting a
+variable that is also a `find` column, is rejected with `invalid_count`.
 
 ## Empty results
 
