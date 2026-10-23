@@ -120,6 +120,10 @@ export interface QueryExecuteSuccess {
   hasMore?: boolean;
   /** DSL only (BeingDB >= 0.1.5): the server's max_results cap, not the query's `limit`, cut the result. */
   truncated?: boolean;
+  /** DSL only (BeingDB >= 0.1.7), only on an empty first page: why there are no rows. */
+  diagnostics?: BeingDbDiagnostic[];
+  provablyEmpty?: boolean;
+  repair?: { query: string; applied: BeingDbRepairStep[] };
   warnings?: BeingDbValidationWarning[];
   language: QueryLanguage;
   languageVersion: string;

@@ -58,7 +58,7 @@ afterAll(async () => {
 
 describe("server identity and status", () => {
   it("identifies itself with the package version", () => {
-    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.3.0" });
+    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.4.0" });
   });
 
   it("reports the local BeingDB as reachable, with version and fingerprint", async () => {
@@ -199,6 +199,19 @@ describe("execute", () => {
       { Artist: { type: "atom", value: "kevin_atherton" }, Work: { type: "atom", value: "work_a" } },
     ]);
     expect(result.structuredContent).toMatchObject({ hasMore: false, truncated: false });
+    expect(result.structuredContent).not.toHaveProperty("diagnostics");
+  });
+
+  it("explains an empty result with BeingDB's diagnostics, without a separate diagnose call", async () => {
+    const dslQuery = "find Artist\nwhere\n  created(Artist, work_aa)";
+    const result = await call("beingdb_query", { query: dslQuery });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual({ query: dslQuery, ...(await native("/query", { language: "dsl", action: "execute", query: dslQuery })) });
+    expect(result.structuredContent).toMatchObject({
+      count: 0,
+      provablyEmpty: true,
+      diagnostics: [{ code: "unknown_constant", evidence: { suggestions: ["work_a", "work_b"] } }],
+    });
   });
 
   it("reports hasMore when the query's own limit stops it, without marking it truncated", async () => {

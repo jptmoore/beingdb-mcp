@@ -163,6 +163,14 @@ const diagnostic = z
   })
   .passthrough();
 
+const provenRepair = z
+  .object({
+    query: z.string().describe("The original query with only the repaired lines rewritten; re-parsed by BeingDB."),
+    applied: z.array(repairStep),
+  })
+  .passthrough()
+  .describe("Present only when BeingDB proves a repair. Deterministic BeingDB output, not a suggestion; never applied automatically.");
+
 const queryEcho = {
   query: z.string().describe("The exact query text submitted (added by beingdb-mcp for transparency)."),
   language: z.string().optional(),
@@ -194,6 +202,19 @@ const executeOutputShape = {
     .describe(
       "DSL only: true when the server's max_results cap -- not the query's own `limit` -- cut the result (a `results_truncated` warning is added). The rows are then NOT the complete answer: do not count or summarise them as if they were; page with `offset` or narrow the query."
     ),
+  diagnostics: z
+    .array(diagnostic)
+    .optional()
+    .describe(
+      "DSL only, and only when the first page is empty: BeingDB's data-aware explanation of why (same as `beingdb_diagnose_query`), e.g. a misspelled constant with `evidence.suggestions`, or a comparison no stored value satisfies with `evidence.observedRange`."
+    ),
+  provablyEmpty: z
+    .boolean()
+    .optional()
+    .describe(
+      "DSL only, with `diagnostics` on an empty result. true: the query as written cannot match, so fix it rather than concluding the fact is missing. false: BeingDB found no fault in the query; the facts are simply not recorded."
+    ),
+  repair: provenRepair.optional(),
 };
 
 const validateOutputShape = {
@@ -218,14 +239,7 @@ const diagnoseOutputShape = {
   warnings: z.array(validationWarning).optional(),
   diagnostics: z.array(diagnostic).describe("Deterministic, data-aware findings from BeingDB, in source-line order."),
   provablyEmpty: z.boolean().describe("True when some diagnostic proves the query as written returns no rows."),
-  repair: z
-    .object({
-      query: z.string().describe("The original query with only the repaired lines rewritten; re-parsed by BeingDB."),
-      applied: z.array(repairStep),
-    })
-    .passthrough()
-    .optional()
-    .describe("Present only when BeingDB proves a repair. Deterministic BeingDB output, not a suggestion; never applied automatically."),
+  repair: provenRepair.optional(),
 };
 
 const getFactsOutputShape = {

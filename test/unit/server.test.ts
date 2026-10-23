@@ -146,6 +146,48 @@ describe("beingdb-mcp server", () => {
     expect(properties).toHaveProperty("truncated");
   });
 
+  it("passes through BeingDB's explanation of an empty DSL result and documents it in the output schema", async () => {
+    const empty = {
+      variables: ["Artist"],
+      results: [],
+      count: 0,
+      hasMore: false,
+      truncated: false,
+      warnings: [],
+      diagnostics: [
+        {
+          code: "unsatisfiable_comparison",
+          severity: "error",
+          message: "No year_created fact has a value at argument 1 satisfying Y > @2090, so the query returns no rows. Values there range from @1968 to @2004.",
+          line: 4,
+          predicate: "year_created",
+          argumentPosition: 1,
+          variable: "Y",
+          value: { type: "year", value: "2090" },
+          scope: "positive",
+          evidence: { observedRange: { min: { type: "year", value: "1968" }, max: { type: "year", value: "2004" } } },
+        },
+      ],
+      provablyEmpty: true,
+      language: "dsl",
+      languageVersion: "beingdb-dsl/1",
+      environmentFingerprint: "sha256:abc",
+    };
+    fetchMock.mockResolvedValueOnce(fakeResponse(200, empty));
+
+    const dslQuery = "find Work\nwhere\n  year_created(Work, Y)\n  Y > @2090";
+    const result = await client.callTool({ name: "beingdb_query", arguments: { query: dslQuery } });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual({ query: dslQuery, ...empty });
+
+    const { tools } = await client.listTools();
+    const properties = (tools.find((t) => t.name === "beingdb_query")?.outputSchema as { properties?: Record<string, unknown> }).properties;
+    expect(properties).toHaveProperty("diagnostics");
+    expect(properties).toHaveProperty("provablyEmpty");
+    expect(properties).toHaveProperty("repair");
+  });
+
   it("surfaces structured validation errors from beingdb_validate_query without marking it a tool error", async () => {
     fetchMock.mockResolvedValueOnce(
       fakeResponse(400, {
