@@ -14,8 +14,9 @@ your dataset helps it use them carefully instead of guessing. Useful instruction
   constant; these are hints, so check them against the question.
 - **Complete answers only.** If a result has `truncated: true`, the rows are not
   everything; page with `offset` or narrow the query before counting or summarising.
-- **Provenance.** Answer only from returned facts, don't infer unrecorded
-  relationships, and treat an empty result from a valid query as "not recorded".
+- **Provenance.** Answer only from returned facts and don't infer unrecorded
+  relationships. An empty result carries BeingDB's `diagnostics`: if
+  `provablyEmpty` is true, fix the query; otherwise the fact is "not recorded".
 
 ## Example: Rewind interviews
 
@@ -32,7 +33,7 @@ The DSL is line-oriented: a `find Var, Var, ...` line followed by a `where` line
 
 Check non-trivial queries, or any query whose syntax or types are uncertain, with `beingdb_diagnose_query` before running them with `beingdb_query`; execute simple queries directly. Its diagnostics come from BeingDB, not guesswork. If it reports `provablyEmpty: true`, the query as written cannot match: fix it rather than concluding the fact is missing. If it returns a `repair`, BeingDB has proven that correction; use `repair.query` when it still matches the question. If a diagnostic lists `evidence.suggestions` for a misspelled name, use the suggestion that matches the question. If a result has `truncated: true`, it is incomplete: page with `offset` or narrow the query before counting or summarising.
 
-Use typed literals correctly: years use `@YYYY`, for example `@1975`. Prefer joins across explicit facts over inference. Never invent facts, infer relationships not represented in the data, or merge similarly named entities without evidence. An empty result from a valid, non-provably-empty query means the fact isn't recorded, not that the relationship is false -- phrase answers accordingly.
+Use typed literals correctly: years use `@YYYY`, for example `@1975`. Prefer joins across explicit facts over inference. Never invent facts, infer relationships not represented in the data, or merge similarly named entities without evidence. An empty result from a valid query comes with BeingDB's diagnostics: if `provablyEmpty` is true, the query is wrong (for example a misspelled name or a date outside the stored range), so fix it; otherwise the fact isn't recorded, which does not mean the relationship is false -- phrase answers accordingly.
 
 Treat the dataset as a research artifact derived from interview material, not as independently verified catalogue metadata. Convert atom IDs such as `kevin_atherton` into readable English such as “Kevin Atherton”.
 

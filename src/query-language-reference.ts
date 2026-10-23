@@ -103,5 +103,7 @@ limit 20
    (\`beingdb_validate_query\` checks structure only; \`beingdb_explain_query\` shows the plan.)
 4. \`beingdb_query\` to execute and get typed, structured rows. \`hasMore: true\` means more
    rows match (page with \`offset\`); \`truncated: true\` means the server's row cap cut the
-   result, so the rows are not the complete answer.
+   result, so the rows are not the complete answer. An empty DSL result carries
+   BeingDB's \`diagnostics\` and \`provablyEmpty\`: \`true\` means fix the query, \`false\`
+   means the facts are not recorded.
 `;

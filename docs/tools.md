@@ -94,3 +94,19 @@ For DSL queries, `beingdb_query` results carry two flags from BeingDB:
 
 Both need BeingDB 0.1.5 or later; older servers omit them. Core-language results
 use `total`/`offset`/`limit` instead.
+
+## Empty results
+
+When a DSL query's first page has no rows, `beingdb_query` also returns BeingDB's
+explanation: the same `diagnostics`, `provablyEmpty` and any proven `repair` that
+`beingdb_diagnose_query` gives, so no second call is needed. For example,
+`created(Artist, work_aa)` comes back with an `unknown_constant` diagnostic
+suggesting `work_a`, and `Y > @2090` on years stored from 1968 to 2004 comes back
+with `unsatisfiable_comparison` and `evidence.observedRange`.
+
+- `provablyEmpty: true`: the query as written cannot match; fix it rather than
+  concluding the fact is missing.
+- `provablyEmpty: false`: BeingDB found no fault in the query; the facts are not
+  recorded.
+
+This needs BeingDB 0.1.7 or later; older servers return the empty rows only.

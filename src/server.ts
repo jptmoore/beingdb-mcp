@@ -29,7 +29,7 @@ import {
 } from "./schemas.js";
 import { QUERY_LANGUAGE_REFERENCE } from "./query-language-reference.js";
 
-export const SERVER_VERSION = "0.3.0";
+export const SERVER_VERSION = "0.4.0";
 
 /**
  * Every tool returns BeingDB's JSON both as `structuredContent` (validated
@@ -120,7 +120,7 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "Execute a BeingDB query",
       description:
-        'Execute a BeingDB query and return typed, structured rows. Prefer the expressive BeingDB DSL (language: "dsl", the default). Use only predicates discovered with `beingdb_list_predicates`. Normally execute a query only once it is valid: for non-trivial generated DSL, check it first with `beingdb_diagnose_query` (or `beingdb_validate_query`). An invalid query returns `valid: false` with structured `errors` instead of rows. For DSL results, `hasMore: true` means more rows match than were returned (fetch them with `offset` in the query text), and `truncated: true` means the server\'s row cap cut the result: the rows are then not the complete answer, so never count or summarise them as if they were. The exact submitted query is returned with the results and may be shown to the user for transparency.',
+        'Execute a BeingDB query and return typed, structured rows. Prefer the expressive BeingDB DSL (language: "dsl", the default). Use only predicates discovered with `beingdb_list_predicates`. Normally execute a query only once it is valid: for non-trivial generated DSL, check it first with `beingdb_diagnose_query` (or `beingdb_validate_query`). An invalid query returns `valid: false` with structured `errors` instead of rows. For DSL results, `hasMore: true` means more rows match than were returned (fetch them with `offset` in the query text), and `truncated: true` means the server\'s row cap cut the result: the rows are then not the complete answer, so never count or summarise them as if they were. When a DSL query returns no rows, the response also explains why with BeingDB\'s `diagnostics` and `provablyEmpty` (and any proven `repair`), as `beingdb_diagnose_query` would: `provablyEmpty: true` means fix the query (e.g. a misspelled constant, or a comparison outside the stored values); `false` means the facts are not recorded. The exact submitted query is returned with the results and may be shown to the user for transparency.',
       inputSchema: queryInputShape,
       outputSchema: executeOutputSchema,
     },
