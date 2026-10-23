@@ -135,6 +135,18 @@ const repairStep = z
   })
   .passthrough();
 
+const diagnosticEvidence = z
+  .object({
+    suggestions: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "On unknown_constant / constant_not_at_position, when the literal occurs nowhere in that predicate: values of the same type that do occur at that argument, ranked by BeingDB as likely corrections (best first), written as DSL literals ready to paste. Hints, not proven repairs -- pick one only if it matches the user's intent."
+      ),
+  })
+  .passthrough()
+  .describe("Data-grounded evidence computed by BeingDB (e.g. occursAtPositions, occursIn, declaredRole, suggestions).");
+
 const diagnostic = z
   .object({
     code: z.string().describe("BeingDB diagnostic code, e.g. constant_not_at_position, singleton_variable."),
@@ -146,7 +158,7 @@ const diagnostic = z
     variable: z.string().optional(),
     value: typedValue.optional(),
     scope: z.string().optional().describe("positive | optional | alternative | negated."),
-    evidence: z.record(z.unknown()).optional().describe("Data-grounded evidence computed by BeingDB."),
+    evidence: diagnosticEvidence.optional(),
     repair: repairStep.optional(),
   })
   .passthrough();
@@ -172,6 +184,16 @@ const executeOutputShape = {
   total: z.number().int().optional(),
   offset: z.number().int().optional(),
   limit: z.number().int().optional(),
+  hasMore: z
+    .boolean()
+    .optional()
+    .describe("DSL only: true when more rows match beyond those returned (stopped by the query's own `limit` or by the server's cap). Fetch the next page with `offset` in the query text."),
+  truncated: z
+    .boolean()
+    .optional()
+    .describe(
+      "DSL only: true when the server's max_results cap -- not the query's own `limit` -- cut the result (a `results_truncated` warning is added). The rows are then NOT the complete answer: do not count or summarise them as if they were; page with `offset` or narrow the query."
+    ),
 };
 
 const validateOutputShape = {

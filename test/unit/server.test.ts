@@ -115,6 +115,37 @@ describe("beingdb-mcp server", () => {
     expect(sentBody.action).toBe("execute");
   });
 
+  it("passes through hasMore / truncated and the results_truncated warning when BeingDB's cap cuts a DSL result", async () => {
+    const capped = {
+      variables: ["Artist"],
+      results: [{ Artist: { type: "atom", value: "kevin_atherton" } }],
+      count: 1,
+      hasMore: true,
+      truncated: true,
+      warnings: [
+        {
+          code: "results_truncated",
+          message: "Only the first 1 rows are returned (the server's max_results limit); more rows match. Page through them with 'offset', or add constraints to narrow the query.",
+        },
+      ],
+      language: "dsl",
+      languageVersion: "beingdb-dsl/1",
+      environmentFingerprint: "sha256:abc",
+    };
+    fetchMock.mockResolvedValueOnce(fakeResponse(200, capped));
+
+    const dslQuery = "find Artist\nwhere\n  artist(Artist)";
+    const result = await client.callTool({ name: "beingdb_query", arguments: { query: dslQuery } });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual({ query: dslQuery, ...capped });
+
+    const { tools } = await client.listTools();
+    const properties = (tools.find((t) => t.name === "beingdb_query")?.outputSchema as { properties?: Record<string, unknown> }).properties;
+    expect(properties).toHaveProperty("hasMore");
+    expect(properties).toHaveProperty("truncated");
+  });
+
   it("surfaces structured validation errors from beingdb_validate_query without marking it a tool error", async () => {
     fetchMock.mockResolvedValueOnce(
       fakeResponse(400, {
@@ -316,6 +347,45 @@ describe("beingdb-mcp server", () => {
 
       expect(result.isError).toBeFalsy();
       expect(result.structuredContent).toEqual({ query: "find X\nwhere\n  artst(X)", ...invalid });
+    });
+
+    it("passes through BeingDB's ranked suggestions for a probably misspelled constant, without a repair", async () => {
+      const typoQuery = "find Artist\nwhere\n  created(Artist, work_aa)";
+      const withSuggestions = {
+        valid: true,
+        errors: [],
+        warnings: [],
+        diagnostics: [
+          {
+            code: "unknown_constant",
+            severity: "error",
+            message: "'work_aa' does not occur in any fact, so created(...) cannot match it. Did you mean work_a?",
+            line: 3,
+            predicate: "created",
+            argumentPosition: 1,
+            value: { type: "atom", value: "work_aa" },
+            scope: "positive",
+            evidence: { declaredRole: "Work", suggestions: ["work_a", "work_b"] },
+          },
+        ],
+        provablyEmpty: true,
+        language: "dsl",
+        languageVersion: "beingdb-dsl/1",
+        environmentFingerprint: "sha256:abc",
+      };
+      fetchMock.mockResolvedValueOnce(fakeResponse(200, withSuggestions));
+
+      const result = await client.callTool({ name: "beingdb_diagnose_query", arguments: { query: typoQuery } });
+
+      expect(result.isError).toBeFalsy();
+      expect(result.structuredContent).toEqual({ query: typoQuery, ...withSuggestions });
+      expect(result.structuredContent).not.toHaveProperty("repair");
+    });
+
+    it("documents evidence.suggestions in its output schema", async () => {
+      const { tools } = await client.listTools();
+      const schema = JSON.stringify(tools.find((t) => t.name === "beingdb_diagnose_query")?.outputSchema);
+      expect(schema).toContain('"suggestions"');
     });
 
     it("surfaces BeingDB rejecting the diagnose action (e.g. an older server) as a tool error", async () => {

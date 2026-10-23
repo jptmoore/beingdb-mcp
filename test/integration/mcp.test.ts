@@ -58,7 +58,7 @@ afterAll(async () => {
 
 describe("server identity and status", () => {
   it("identifies itself with the package version", () => {
-    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.2.0" });
+    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.3.0" });
   });
 
   it("reports the local BeingDB as reachable, with version and fingerprint", async () => {
@@ -168,6 +168,18 @@ describe("diagnose", () => {
     expect(result.structuredContent).toMatchObject({ query: dslQuery, valid: false, errors: [{ code: "unknown_predicate", suggestions: ["artist"] }] });
   });
 
+  it("passes through BeingDB's suggestions for a misspelled constant, as hints rather than a repair", async () => {
+    const dslQuery = "find Artist\nwhere\n  created(Artist, work_aa)";
+    const result = await call("beingdb_diagnose_query", { query: dslQuery });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual({ query: dslQuery, ...(await native("/query", { language: "dsl", action: "diagnose", query: dslQuery })) });
+    expect(result.structuredContent).toMatchObject({
+      provablyEmpty: true,
+      diagnostics: [{ code: "unknown_constant", argumentPosition: 1, evidence: { suggestions: ["work_a", "work_b"] } }],
+    });
+    expect(result.structuredContent).not.toHaveProperty("repair");
+  });
+
   it("diagnoses a valid query cleanly", async () => {
     const dslQuery = "find Artist, Work\nwhere\n  created(Artist, Work)";
     const result = await call("beingdb_diagnose_query", { query: dslQuery });
@@ -186,6 +198,18 @@ describe("execute", () => {
       { Artist: { type: "atom", value: "david_hall" }, Work: { type: "atom", value: "work_b" } },
       { Artist: { type: "atom", value: "kevin_atherton" }, Work: { type: "atom", value: "work_a" } },
     ]);
+    expect(result.structuredContent).toMatchObject({ hasMore: false, truncated: false });
+  });
+
+  it("reports hasMore when the query's own limit stops it, without marking it truncated", async () => {
+    const dslQuery = "find Artist\nwhere\n  artist(Artist)\norder by Artist ascending\nlimit 1";
+    const result = await call("beingdb_query", { query: dslQuery });
+    expect(result.structuredContent).toEqual({ query: dslQuery, ...(await native("/query", { language: "dsl", action: "execute", query: dslQuery })) });
+    expect(result.structuredContent).toMatchObject({ count: 1, hasMore: true, truncated: false, warnings: [] });
+
+    const lastPage = `${dslQuery}\noffset 1`;
+    const next = await call("beingdb_query", { query: lastPage });
+    expect(next.structuredContent).toMatchObject({ count: 1, hasMore: false, truncated: false });
   });
 
   it("validates then executes a non-trivial DSL join, preserving the exact query", async () => {

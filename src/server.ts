@@ -29,7 +29,7 @@ import {
 } from "./schemas.js";
 import { QUERY_LANGUAGE_REFERENCE } from "./query-language-reference.js";
 
-export const SERVER_VERSION = "0.2.0";
+export const SERVER_VERSION = "0.3.0";
 
 /**
  * Every tool returns BeingDB's JSON both as `structuredContent` (validated
@@ -120,7 +120,7 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "Execute a BeingDB query",
       description:
-        'Execute a BeingDB query and return typed, structured rows. Prefer the expressive BeingDB DSL (language: "dsl", the default). Use only predicates discovered with `beingdb_list_predicates`. Normally execute a query only once it is valid: for non-trivial generated DSL, check it first with `beingdb_diagnose_query` (or `beingdb_validate_query`). An invalid query returns `valid: false` with structured `errors` instead of rows. The exact submitted query is returned with the results and may be shown to the user for transparency.',
+        'Execute a BeingDB query and return typed, structured rows. Prefer the expressive BeingDB DSL (language: "dsl", the default). Use only predicates discovered with `beingdb_list_predicates`. Normally execute a query only once it is valid: for non-trivial generated DSL, check it first with `beingdb_diagnose_query` (or `beingdb_validate_query`). An invalid query returns `valid: false` with structured `errors` instead of rows. For DSL results, `hasMore: true` means more rows match than were returned (fetch them with `offset` in the query text), and `truncated: true` means the server\'s row cap cut the result: the rows are then not the complete answer, so never count or summarise them as if they were. The exact submitted query is returned with the results and may be shown to the user for transparency.',
       inputSchema: queryInputShape,
       outputSchema: executeOutputSchema,
     },
@@ -158,7 +158,7 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "Diagnose a BeingDB DSL query",
       description:
-        "Check a candidate DSL query against the actual data without executing it (BeingDB's `diagnose` action). Returns the same `valid` / `errors` / `warnings` as `beingdb_validate_query`, plus deterministic, data-grounded `diagnostics` from BeingDB (each with a `code`, `severity`, location and `evidence`) -- for example a constant that never occurs at that argument position, a join whose arguments share no value, or a variable named after a different argument's declared role. `provablyEmpty: true` means BeingDB proved the query as written returns no rows. When BeingDB can prove a correction it also returns `repair.query` (the rewritten query) and `repair.applied`: this is exact BeingDB output, not a guess, but it is never applied automatically -- run `repair.query` with `beingdb_query` (or diagnose it again) if it matches your intent. Recommended before executing non-trivial generated DSL. The exact submitted query is returned alongside the diagnosis.",
+        "Check a candidate DSL query against the actual data without executing it (BeingDB's `diagnose` action). Returns the same `valid` / `errors` / `warnings` as `beingdb_validate_query`, plus deterministic, data-grounded `diagnostics` from BeingDB (each with a `code`, `severity`, location and `evidence`) -- for example a constant that never occurs at that argument position, a join whose arguments share no value, or a variable named after a different argument's declared role. `provablyEmpty: true` means BeingDB proved the query as written returns no rows. When a constant is probably misspelled (it occurs nowhere in that predicate), its diagnostic's `evidence.suggestions` lists the closest values that do occur there, best first, as DSL literals: these are hints, not proven -- use one only if it matches the user's intent. When BeingDB can prove a correction it also returns `repair.query` (the rewritten query) and `repair.applied`: this is exact BeingDB output, not a guess, but it is never applied automatically -- run `repair.query` with `beingdb_query` (or diagnose it again) if it matches your intent. Recommended before executing non-trivial generated DSL. The exact submitted query is returned alongside the diagnosis.",
       inputSchema: diagnoseInputShape,
       outputSchema: diagnoseOutputSchema,
     },

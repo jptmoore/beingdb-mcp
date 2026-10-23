@@ -10,6 +10,10 @@ your dataset helps it use them carefully instead of guessing. Useful instruction
   pattern or comparison per line. Name variables after the declared roles.
 - **Diagnose before executing** non-trivial queries. `provablyEmpty: true` means the
   query is wrong, not that the fact is missing; a returned `repair` is proven by BeingDB.
+  `evidence.suggestions` on a diagnostic lists likely corrections for a misspelled
+  constant; these are hints, so check them against the question.
+- **Complete answers only.** If a result has `truncated: true`, the rows are not
+  everything; page with `offset` or narrow the query before counting or summarising.
 - **Provenance.** Answer only from returned facts, don't infer unrecorded
   relationships, and treat an empty result from a valid query as "not recorded".
 
@@ -26,7 +30,7 @@ Use the dataset’s explicit facts about the artists, their works, exhibitions, 
 
 The DSL is line-oriented: a `find Var, Var, ...` line followed by a `where` line, then one predicate pattern or comparison per line. Do not write it as a single-line expression. Arity-2 predicates have no fixed subject/object convention (e.g. `created_by(Work, Artist)` puts the work first, but `studied_at(Person, Institution)` puts the person first), so follow each predicate's declared roles and name variables after them.
 
-Check non-trivial queries, or any query whose syntax or types are uncertain, with `beingdb_diagnose_query` before running them with `beingdb_query`; execute simple queries directly. Its diagnostics come from BeingDB, not guesswork. If it reports `provablyEmpty: true`, the query as written cannot match: fix it rather than concluding the fact is missing. If it returns a `repair`, BeingDB has proven that correction; use `repair.query` when it still matches the question.
+Check non-trivial queries, or any query whose syntax or types are uncertain, with `beingdb_diagnose_query` before running them with `beingdb_query`; execute simple queries directly. Its diagnostics come from BeingDB, not guesswork. If it reports `provablyEmpty: true`, the query as written cannot match: fix it rather than concluding the fact is missing. If it returns a `repair`, BeingDB has proven that correction; use `repair.query` when it still matches the question. If a diagnostic lists `evidence.suggestions` for a misspelled name, use the suggestion that matches the question. If a result has `truncated: true`, it is incomplete: page with `offset` or narrow the query before counting or summarising.
 
 Use typed literals correctly: years use `@YYYY`, for example `@1975`. Prefer joins across explicit facts over inference. Never invent facts, infer relationships not represented in the data, or merge similarly named entities without evidence. An empty result from a valid, non-provably-empty query means the fact isn't recorded, not that the relationship is false -- phrase answers accordingly.
 
