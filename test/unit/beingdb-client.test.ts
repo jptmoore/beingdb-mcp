@@ -132,7 +132,7 @@ describe("BeingDbClient", () => {
     fetchMock.mockResolvedValueOnce(fakeResponse(200, body));
 
     const client = new BeingDbClient({ baseUrl: "http://localhost:8080" });
-    const outcome = await client.runQuery({ query: "find X\nwhere\n  artst(X)", language: "dsl", action: "diagnose" });
+    const outcome = await client.runQuery({ query: "find X\nwhere\n  artst(X)", action: "diagnose" });
 
     const sent = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
     expect(sent).toEqual({ query: "find X\nwhere\n  artst(X)", language: "dsl", action: "diagnose" });
@@ -172,7 +172,7 @@ describe("BeingDbClient", () => {
 
     const client = new BeingDbClient({ baseUrl: "http://localhost:8080" });
     const dslQuery = "find Artist, Work, Institution\nwhere\n  created(Artist, Work)\n  optional\n    studied_at(Artist, Institution)";
-    const outcome = await client.runQuery({ query: dslQuery, language: "dsl" });
+    const outcome = await client.runQuery({ query: dslQuery });
 
     expect(outcome.outcome).toBe("success");
     if (outcome.outcome === "success" && "results" in outcome.body) {
@@ -254,7 +254,7 @@ describe("BeingDbClient", () => {
     fetchMock.mockResolvedValueOnce(fakeResponse(400, { error: { code: "malformed_request", message: "Missing 'query' field" } }));
 
     const client = new BeingDbClient({ baseUrl: "http://localhost:8080" });
-    const outcome = await client.runQuery({ query: "created(Artist, Work)" });
+    const outcome = await client.runQuery({ query: "find Artist, Work\nwhere\n  created(Artist, Work)" });
 
     expect(outcome.outcome).toBe("transport_error");
     if (outcome.outcome === "transport_error") {

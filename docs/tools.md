@@ -8,7 +8,7 @@ repairs all come from BeingDB; the MCP server never derives or rewrites them.
 |---|---|---|
 | `beingdb_list_predicates` | `GET /predicates` | Discover the schema. With `detailed: true` (implied by `names`/`search`): arity, fact count, per-argument observed types, examples, and any declared `description` and argument `role`/`semanticType`, plus `environmentFingerprint` and `languageVersion` |
 | `beingdb_diagnose_query` | `POST /query` (`dsl`, `diagnose`) | Check a candidate DSL query against the data: validation, `diagnostics`, `provablyEmpty` and any proven `repair` |
-| `beingdb_validate_query` | `POST /query` (`validate`) | Structural validation only (DSL or core) |
+| `beingdb_validate_query` | `POST /query` (`validate`) | Structural validation only |
 | `beingdb_explain_query` | `POST /query` (`explain`) | Show the access plan |
 | `beingdb_query` | `POST /query` (`execute`) | Run a query and get typed rows |
 | `beingdb_get_facts` | `GET /query/:predicate` | Dump one predicate's facts |
@@ -83,8 +83,12 @@ later; older servers simply omit it.
 
 ## Complete and incomplete results
 
-For DSL queries, `beingdb_query` results carry two flags from BeingDB:
+BeingDB has one query language, the `find`/`where` DSL, so every query tool takes
+just the query text; paging is `limit N` / `offset N` in that text. `beingdb_query`
+results carry a count and two flags from BeingDB:
 
+- `total`: how many rows the query matches, regardless of `limit`, `offset` or the
+  server's row cap. Answer "how many" questions from it rather than by counting rows.
 - `hasMore: true`: more rows match than were returned, because the query's own
   `limit` or the server's row cap stopped it. Fetch the next page with `offset N`
   in the query text.
@@ -92,8 +96,8 @@ For DSL queries, `beingdb_query` results carry two flags from BeingDB:
   the result, and a `results_truncated` warning is added. The rows are not the
   complete answer, so an LLM must not count or summarise them as if they were.
 
-Both need BeingDB 0.1.5 or later; older servers omit them. Core-language results
-use `total`/`offset`/`limit` instead.
+`hasMore` and `truncated` need BeingDB 0.1.5 or later and `total` needs 0.2.0;
+older servers omit them.
 
 ## Empty results
 

@@ -12,7 +12,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 import type { BeingDbClient } from "./beingdb-client.js";
 import { BeingDbError } from "./types.js";
-import type { QueryLanguage, QueryOutcome } from "./types.js";
+import type { QueryOutcome } from "./types.js";
 import {
   diagnoseInputShape,
   diagnoseOutputSchema,
@@ -29,7 +29,7 @@ import {
 } from "./schemas.js";
 import { QUERY_LANGUAGE_REFERENCE } from "./query-language-reference.js";
 
-export const SERVER_VERSION = "0.4.0";
+export const SERVER_VERSION = "0.5.0";
 
 /**
  * Every tool returns BeingDB's JSON both as `structuredContent` (validated
@@ -62,9 +62,9 @@ function toolErrorResult(err: unknown): CallToolResult {
  * failures -- a structurally invalid query (`valid: false`) is a normal,
  * informative result, not a tool failure.
  */
-function buildQueryToolResult(outcome: QueryOutcome, query: string, language: QueryLanguage): CallToolResult {
+function buildQueryToolResult(outcome: QueryOutcome, query: string): CallToolResult {
   if (outcome.outcome === "transport_error") {
-    return jsonResult({ query, language, error: outcome.body }, true);
+    return jsonResult({ query, language: "dsl", error: outcome.body }, true);
   }
   // outcome.body already carries its own authoritative `language` (BeingDB
   // echoes it on every success/invalid response); `query` never comes from
@@ -120,14 +120,14 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "Execute a BeingDB query",
       description:
-        'Execute a BeingDB query and return typed, structured rows. Prefer the expressive BeingDB DSL (language: "dsl", the default). Use only predicates discovered with `beingdb_list_predicates`. Normally execute a query only once it is valid: for non-trivial generated DSL, check it first with `beingdb_diagnose_query` (or `beingdb_validate_query`). An invalid query returns `valid: false` with structured `errors` instead of rows. For DSL results, `hasMore: true` means more rows match than were returned (fetch them with `offset` in the query text), and `truncated: true` means the server\'s row cap cut the result: the rows are then not the complete answer, so never count or summarise them as if they were. When a DSL query returns no rows, the response also explains why with BeingDB\'s `diagnostics` and `provablyEmpty` (and any proven `repair`), as `beingdb_diagnose_query` would: `provablyEmpty: true` means fix the query (e.g. a misspelled constant, or a comparison outside the stored values); `false` means the facts are not recorded. The exact submitted query is returned with the results and may be shown to the user for transparency.',
+        'Execute a BeingDB find/where query and return typed, structured rows. Use only predicates discovered with `beingdb_list_predicates`. Normally execute a query only once it is valid: for non-trivial generated DSL, check it first with `beingdb_diagnose_query` (or `beingdb_validate_query`). An invalid query returns `valid: false` with structured `errors` instead of rows. `total` is the number of rows the query matches (use it for "how many" questions); `hasMore: true` means more rows match than were returned (fetch them with `offset` in the query text), and `truncated: true` means the server\'s row cap cut the result: the rows are then not the complete answer, so never count or summarise them as if they were. When a query returns no rows, the response also explains why with BeingDB\'s `diagnostics` and `provablyEmpty` (and any proven `repair`), as `beingdb_diagnose_query` would: `provablyEmpty: true` means fix the query (e.g. a misspelled constant, or a comparison outside the stored values); `false` means the facts are not recorded. The exact submitted query is returned with the results and may be shown to the user for transparency.',
       inputSchema: queryInputShape,
       outputSchema: executeOutputSchema,
     },
     async (args): Promise<CallToolResult> => {
       try {
-        const outcome = await client.runQuery({ ...args, action: "execute" });
-        return buildQueryToolResult(outcome, args.query, args.language);
+        const outcome = await client.runQuery({ query: args.query, action: "execute" });
+        return buildQueryToolResult(outcome, args.query);
       } catch (err) {
         return toolErrorResult(err);
       }
@@ -139,14 +139,14 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "Validate a BeingDB query",
       description:
-        "Validate a BeingDB query (DSL or core) without executing it: syntax and structure against the schema only, with no checks against the data. Returns `valid` plus structured `errors` and `warnings` (e.g. unknown_predicate with suggestions, arity_mismatch, disconnected_query, unsafe_negation), the language version and environment fingerprint. For DSL queries, `beingdb_diagnose_query` returns the same validation plus data-aware diagnostics and proven repairs. The exact submitted query remains visible even on validation failure.",
+        "Validate a BeingDB find/where query without executing it: syntax and structure against the schema only, with no checks against the data. Returns `valid` plus structured `errors` and `warnings` (e.g. unknown_predicate with suggestions, arity_mismatch, disconnected_query, unsafe_negation), the language version and environment fingerprint. `beingdb_diagnose_query` returns the same validation plus data-aware diagnostics and proven repairs. The exact submitted query remains visible even on validation failure.",
       inputSchema: validateOrExplainInputShape,
       outputSchema: validateOutputSchema,
     },
     async (args): Promise<CallToolResult> => {
       try {
-        const outcome = await client.runQuery({ ...args, action: "validate" });
-        return buildQueryToolResult(outcome, args.query, args.language);
+        const outcome = await client.runQuery({ query: args.query, action: "validate" });
+        return buildQueryToolResult(outcome, args.query);
       } catch (err) {
         return toolErrorResult(err);
       }
@@ -164,8 +164,8 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     },
     async (args): Promise<CallToolResult> => {
       try {
-        const outcome = await client.runQuery({ query: args.query, language: "dsl", action: "diagnose" });
-        return buildQueryToolResult(outcome, args.query, "dsl");
+        const outcome = await client.runQuery({ query: args.query, action: "diagnose" });
+        return buildQueryToolResult(outcome, args.query);
       } catch (err) {
         return toolErrorResult(err);
       }
@@ -183,8 +183,8 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     },
     async (args): Promise<CallToolResult> => {
       try {
-        const outcome = await client.runQuery({ ...args, action: "explain" });
-        return buildQueryToolResult(outcome, args.query, args.language);
+        const outcome = await client.runQuery({ query: args.query, action: "explain" });
+        return buildQueryToolResult(outcome, args.query);
       } catch (err) {
         return toolErrorResult(err);
       }

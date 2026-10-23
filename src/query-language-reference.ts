@@ -11,8 +11,8 @@
  */
 export const QUERY_LANGUAGE_REFERENCE = `# BeingDB DSL quick reference
 
-The DSL is a line-oriented \`find\`/\`where\` query language. It reuses the
-same predicate patterns and comparisons as BeingDB's core language, plus
+BeingDB has one query language: the line-oriented \`find\`/\`where\` DSL.
+Each \`where\` line is a predicate pattern or a comparison; the DSL adds
 projection, optional matches, disjunction, negation, ordering,
 deduplication and pagination.
 
@@ -101,7 +101,8 @@ limit 20
    probably misspelled constant comes with \`evidence.suggestions\` (closest values that
    occur at that argument) -- hints, not proofs.
    (\`beingdb_validate_query\` checks structure only; \`beingdb_explain_query\` shows the plan.)
-4. \`beingdb_query\` to execute and get typed, structured rows. \`hasMore: true\` means more
+4. \`beingdb_query\` to execute and get typed, structured rows. \`total\` is how many rows
+   the query matches (answer "how many" from it); \`hasMore: true\` means more
    rows match (page with \`offset\`); \`truncated: true\` means the server's row cap cut the
    result, so the rows are not the complete answer. An empty DSL result carries
    BeingDB's \`diagnostics\` and \`provablyEmpty\`: \`true\` means fix the query, \`false\`

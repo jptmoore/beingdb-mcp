@@ -11,12 +11,6 @@
  */
 import { z } from "zod";
 
-export const queryLanguageSchema = z
-  .enum(["dsl", "core"])
-  .describe(
-    "Query language: \"dsl\" (the expressive find/where language -- preferred) or \"core\" (the low-level pattern language). Defaults to \"dsl\"."
-  );
-
 export const listPredicatesInputShape = {
   detailed: z
     .boolean()
@@ -41,30 +35,21 @@ export const listPredicatesInputShape = {
     .describe("Include up to N sample facts per predicate. Ignored when `detailed` is true (or implied)."),
 };
 
+const queryText = z
+  .string()
+  .min(1)
+  .describe("A BeingDB find/where query: a `find` line, a `where` line, then one pattern or comparison per line; optional `order by`, `limit N`, `offset N` lines.");
+
 export const queryInputShape = {
-  query: z.string().min(1).describe("The BeingDB query text (DSL `find`/`where` syntax by default, or core-language patterns if `language: \"core\"`)."),
-  language: queryLanguageSchema.default("dsl"),
-  offset: z
-    .number()
-    .int()
-    .min(0)
-    .optional()
-    .describe("Pagination offset (core language only; for the DSL use `offset N` inside the query text)."),
-  limit: z
-    .number()
-    .int()
-    .positive()
-    .optional()
-    .describe("Maximum results to return (core language only; for the DSL use `limit N` inside the query text)."),
+  query: queryText,
 };
 
 export const validateOrExplainInputShape = {
-  query: z.string().min(1).describe("The BeingDB query text to check (DSL `find`/`where` syntax by default, or core-language patterns if `language: \"core\"`)."),
-  language: queryLanguageSchema.default("dsl"),
+  query: queryText,
 };
 
 export const diagnoseInputShape = {
-  query: z.string().min(1).describe("The candidate BeingDB DSL query (`find`/`where` syntax). Diagnosis is DSL-only."),
+  query: queryText,
 };
 
 export const getFactsInputShape = {
@@ -188,31 +173,33 @@ const executeOutputShape = {
   ...validityFields,
   variables: z.array(z.string()).optional(),
   results: z.array(z.record(typedValue.nullable())).optional().describe("Rows: variable -> typed value, or null when left unbound by `optional`."),
-  count: z.number().int().optional(),
-  total: z.number().int().optional(),
-  offset: z.number().int().optional(),
-  limit: z.number().int().optional(),
+  count: z.number().int().optional().describe("Rows returned in this response."),
+  total: z
+    .number()
+    .int()
+    .optional()
+    .describe("Rows the query matches in total, regardless of `limit`, `offset` or the server's cap. Use it to answer \"how many\" questions instead of counting returned rows."),
   hasMore: z
     .boolean()
     .optional()
-    .describe("DSL only: true when more rows match beyond those returned (stopped by the query's own `limit` or by the server's cap). Fetch the next page with `offset` in the query text."),
+    .describe("True when more rows match beyond those returned (stopped by the query's own `limit` or by the server's cap). Fetch the next page with `offset` in the query text."),
   truncated: z
     .boolean()
     .optional()
     .describe(
-      "DSL only: true when the server's max_results cap -- not the query's own `limit` -- cut the result (a `results_truncated` warning is added). The rows are then NOT the complete answer: do not count or summarise them as if they were; page with `offset` or narrow the query."
+      "True when the server's max_results cap -- not the query's own `limit` -- cut the result (a `results_truncated` warning is added). The rows are then NOT the complete answer: do not count or summarise them as if they were; page with `offset` or narrow the query."
     ),
   diagnostics: z
     .array(diagnostic)
     .optional()
     .describe(
-      "DSL only, and only when the first page is empty: BeingDB's data-aware explanation of why (same as `beingdb_diagnose_query`), e.g. a misspelled constant with `evidence.suggestions`, or a comparison no stored value satisfies with `evidence.observedRange`."
+      "Only when the first page is empty: BeingDB's data-aware explanation of why (same as `beingdb_diagnose_query`), e.g. a misspelled constant with `evidence.suggestions`, or a comparison no stored value satisfies with `evidence.observedRange`."
     ),
   provablyEmpty: z
     .boolean()
     .optional()
     .describe(
-      "DSL only, with `diagnostics` on an empty result. true: the query as written cannot match, so fix it rather than concluding the fact is missing. false: BeingDB found no fault in the query; the facts are simply not recorded."
+      "With `diagnostics` on an empty result. true: the query as written cannot match, so fix it rather than concluding the fact is missing. false: BeingDB found no fault in the query; the facts are simply not recorded."
     ),
   repair: provenRepair.optional(),
 };

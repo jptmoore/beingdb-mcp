@@ -58,7 +58,7 @@ afterAll(async () => {
 
 describe("server identity and status", () => {
   it("identifies itself with the package version", () => {
-    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.4.0" });
+    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.5.0" });
   });
 
   it("reports the local BeingDB as reachable, with version and fingerprint", async () => {
@@ -218,7 +218,7 @@ describe("execute", () => {
     const dslQuery = "find Artist\nwhere\n  artist(Artist)\norder by Artist ascending\nlimit 1";
     const result = await call("beingdb_query", { query: dslQuery });
     expect(result.structuredContent).toEqual({ query: dslQuery, ...(await native("/query", { language: "dsl", action: "execute", query: dslQuery })) });
-    expect(result.structuredContent).toMatchObject({ count: 1, hasMore: true, truncated: false, warnings: [] });
+    expect(result.structuredContent).toMatchObject({ count: 1, total: 2, hasMore: true, truncated: false, warnings: [] });
 
     const lastPage = `${dslQuery}\noffset 1`;
     const next = await call("beingdb_query", { query: lastPage });
