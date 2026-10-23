@@ -12,8 +12,9 @@ your dataset helps it use them carefully instead of guessing. Useful instruction
   query is wrong, not that the fact is missing; a returned `repair` is proven by BeingDB.
   `evidence.suggestions` on a diagnostic lists likely corrections for a misspelled
   constant; these are hints, so check them against the question.
-- **Complete answers only.** If a result has `truncated: true`, the rows are not
-  everything; page with `offset` or narrow the query before counting or summarising.
+- **Complete answers only.** Answer "how many" from `total`. If a result has
+  `truncated: true`, the rows are not everything; page with `offset` or narrow the
+  query before summarising.
 - **Provenance.** Answer only from returned facts and don't infer unrecorded
   relationships. An empty result carries BeingDB's `diagnostics`: if
   `provablyEmpty` is true, fix the query; otherwise the fact is "not recorded".

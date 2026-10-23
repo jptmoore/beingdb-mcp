@@ -7,8 +7,8 @@
  * preserve types" design goal.
  */
 
-export type QueryLanguage = "dsl" | "core";
-/** `"diagnose"` is DSL-only in BeingDB; the core language rejects it with `unknown_action`. */
+/** BeingDB queries use the find/where language; BeingDB echoes `"dsl"` as `language`. */
+export type QueryLanguage = "dsl";
 export type QueryAction = "execute" | "validate" | "explain" | "diagnose";
 
 /** A single typed BeingDB value, e.g. {"type":"atom","value":"tina_keane"}. */
@@ -113,14 +113,13 @@ export interface QueryExecuteSuccess {
   variables: string[];
   results: BeingDbBinding[];
   count: number;
+  /** BeingDB >= 0.2.0: rows the query matches, regardless of limit/offset/cap. */
   total?: number;
-  offset?: number;
-  limit?: number;
-  /** DSL only (BeingDB >= 0.1.5): more rows match beyond those returned. */
+  /** BeingDB >= 0.1.5: more rows match beyond those returned. */
   hasMore?: boolean;
-  /** DSL only (BeingDB >= 0.1.5): the server's max_results cap, not the query's `limit`, cut the result. */
+  /** BeingDB >= 0.1.5: the server's max_results cap, not the query's `limit`, cut the result. */
   truncated?: boolean;
-  /** DSL only (BeingDB >= 0.1.7), only on an empty first page: why there are no rows. */
+  /** BeingDB >= 0.1.7, only on an empty first page: why there are no rows. */
   diagnostics?: BeingDbDiagnostic[];
   provablyEmpty?: boolean;
   repair?: { query: string; applied: BeingDbRepairStep[] };

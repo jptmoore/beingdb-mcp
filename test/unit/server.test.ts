@@ -53,18 +53,11 @@ describe("beingdb-mcp server", () => {
       "beingdb_validate_query",
     ]);
 
-    const queryTool = tools.find((t) => t.name === "beingdb_query");
-    expect(queryTool?.inputSchema.properties).toHaveProperty("query");
-    expect(queryTool?.inputSchema.properties).toHaveProperty("language");
-    expect(queryTool?.inputSchema.properties).toHaveProperty("offset");
-    expect(queryTool?.inputSchema.properties).toHaveProperty("limit");
-
-    const validateTool = tools.find((t) => t.name === "beingdb_validate_query");
-    expect(validateTool?.inputSchema.properties).toHaveProperty("query");
-    expect(validateTool?.inputSchema.properties).toHaveProperty("language");
-
-    const diagnoseTool = tools.find((t) => t.name === "beingdb_diagnose_query");
-    expect(Object.keys(diagnoseTool?.inputSchema.properties ?? {})).toEqual(["query"]);
+    // Every query tool takes only the find/where query text: no language or request-level paging.
+    for (const name of ["beingdb_query", "beingdb_validate_query", "beingdb_explain_query", "beingdb_diagnose_query"]) {
+      const tool = tools.find((t) => t.name === name);
+      expect(Object.keys(tool?.inputSchema.properties ?? {}), name).toEqual(["query"]);
+    }
 
     // Every tool advertises a structured output schema that tolerates fields BeingDB may add later.
     for (const tool of tools) {

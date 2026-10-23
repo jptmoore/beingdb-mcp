@@ -34,10 +34,7 @@ export interface ListPredicatesOptions {
 
 export interface RunQueryOptions {
   query: string;
-  language?: QueryLanguage;
   action?: QueryAction;
-  offset?: number;
-  limit?: number;
 }
 
 export interface BeingDbStatus {
@@ -146,7 +143,7 @@ export class BeingDbClient {
   }
 
   /**
-   * `POST /query` -- execute, validate, explain or (DSL only) diagnose a
+   * `POST /query` -- execute, validate, explain or diagnose a find/where
    * query. Never throws for a query-invalid result or a structured
    * runtime failure (both come back as a {@link QueryOutcome}); only
    * throws {@link BeingDbError} for connection failures, timeouts, or a
@@ -154,11 +151,10 @@ export class BeingDbClient {
    * it is classified `invalid` when its `valid` field is `false`.
    */
   async runQuery(opts: RunQueryOptions): Promise<QueryOutcome> {
-    const language = opts.language ?? "dsl";
+    // Sent explicitly so BeingDB servers older than 0.2.0 (default "core") still read find/where.
+    const language: QueryLanguage = "dsl";
     const action = opts.action ?? "execute";
     const body: Record<string, unknown> = { query: opts.query, language, action };
-    if (opts.offset !== undefined) body.offset = opts.offset;
-    if (opts.limit !== undefined) body.limit = opts.limit;
 
     const startedAt = Date.now();
     const { status, json } = await this.requestRaw("POST", "/query", body);
