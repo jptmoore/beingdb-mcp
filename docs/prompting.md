@@ -12,7 +12,8 @@ your dataset helps it use them carefully instead of guessing. Useful instruction
   query is wrong, not that the fact is missing; a returned `repair` is proven by BeingDB.
   `evidence.suggestions` on a diagnostic lists likely corrections for a misspelled
   constant; these are hints, so check them against the question.
-- **Complete answers only.** Answer "how many" from `total`. If a result has
+- **Complete answers only.** Answer "how many" with `count(Var)` in the query
+  (distinct values, optionally per group). If a result has
   `truncated: true`, the rows are not everything; page with `offset` or narrow the
   query before summarising.
 - **Provenance.** Answer only from returned facts and don't infer unrecorded
@@ -34,7 +35,7 @@ The DSL is line-oriented: a `find Var, Var, ...` line followed by a `where` line
 
 Check non-trivial queries, or any query whose syntax or types are uncertain, with `beingdb_diagnose_query` before running them with `beingdb_query`; execute simple queries directly. Its diagnostics come from BeingDB, not guesswork. If it reports `provablyEmpty: true`, the query as written cannot match: fix it rather than concluding the fact is missing. If it returns a `repair`, BeingDB has proven that correction; use `repair.query` when it still matches the question. If a diagnostic lists `evidence.suggestions` for a misspelled name, use the suggestion that matches the question. If a result has `truncated: true`, it is incomplete: page with `offset` or narrow the query before counting or summarising.
 
-Use typed literals correctly: years use `@YYYY`, for example `@1975`. Prefer joins across explicit facts over inference. Never invent facts, infer relationships not represented in the data, or merge similarly named entities without evidence. An empty result from a valid query comes with BeingDB's diagnostics: if `provablyEmpty` is true, the query is wrong (for example a misspelled name or a date outside the stored range), so fix it; otherwise the fact isn't recorded, which does not mean the relationship is false -- phrase answers accordingly.
+For "how many" questions, count in the query with `count(Var)` (for example `find Artist, count(Work)`) rather than counting returned rows. Use typed literals correctly: years use `@YYYY`, for example `@1975`. Prefer joins across explicit facts over inference. Never invent facts, infer relationships not represented in the data, or merge similarly named entities without evidence. An empty result from a valid query comes with BeingDB's diagnostics: if `provablyEmpty` is true, the query is wrong (for example a misspelled name or a date outside the stored range), so fix it; otherwise the fact isn't recorded, which does not mean the relationship is false -- phrase answers accordingly.
 
 Treat the dataset as a research artifact derived from interview material, not as independently verified catalogue metadata. Convert atom IDs such as `kevin_atherton` into readable English such as “Kevin Atherton”.
 

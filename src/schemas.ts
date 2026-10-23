@@ -178,7 +178,7 @@ const executeOutputShape = {
     .number()
     .int()
     .optional()
-    .describe("Rows the query matches in total, regardless of `limit`, `offset` or the server's cap. Use it to answer \"how many\" questions instead of counting returned rows."),
+    .describe("Result rows the query matches in total, regardless of `limit`, `offset` or the server's cap (for a count(...) query, the number of groups). Rows can repeat a value through joins; to count distinct things use count(Var) in `find`."),
   hasMore: z
     .boolean()
     .optional()
