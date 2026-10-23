@@ -97,7 +97,11 @@ limit 20
 2. Construct DSL using only predicates that were actually discovered.
 3. \`beingdb_diagnose_query\` before executing non-trivial queries: validation plus
    data-aware diagnostics (\`provablyEmpty\`, per-diagnostic \`code\`/\`severity\`/\`evidence\`)
-   and, when BeingDB can prove one, a \`repair.query\` you may choose to run.
+   and, when BeingDB can prove one, a \`repair.query\` you may choose to run. A
+   probably misspelled constant comes with \`evidence.suggestions\` (closest values that
+   occur at that argument) -- hints, not proofs.
    (\`beingdb_validate_query\` checks structure only; \`beingdb_explain_query\` shows the plan.)
-4. \`beingdb_query\` to execute and get typed, structured rows.
+4. \`beingdb_query\` to execute and get typed, structured rows. \`hasMore: true\` means more
+   rows match (page with \`offset\`); \`truncated: true\` means the server's row cap cut the
+   result, so the rows are not the complete answer.
 `;

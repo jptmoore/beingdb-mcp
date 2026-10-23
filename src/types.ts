@@ -116,6 +116,10 @@ export interface QueryExecuteSuccess {
   total?: number;
   offset?: number;
   limit?: number;
+  /** DSL only (BeingDB >= 0.1.5): more rows match beyond those returned. */
+  hasMore?: boolean;
+  /** DSL only (BeingDB >= 0.1.5): the server's max_results cap, not the query's `limit`, cut the result. */
+  truncated?: boolean;
   warnings?: BeingDbValidationWarning[];
   language: QueryLanguage;
   languageVersion: string;
@@ -165,7 +169,8 @@ export interface BeingDbDiagnostic {
   variable?: string;
   value?: BeingDbTypedValue;
   scope?: string;
-  evidence?: Record<string, unknown>;
+  /** `suggestions` (BeingDB >= 0.1.5): likely corrections for an unmatched literal, as DSL literals; hints, not repairs. */
+  evidence?: { suggestions?: string[]; [key: string]: unknown };
   repair?: BeingDbRepairStep;
   [key: string]: unknown;
 }

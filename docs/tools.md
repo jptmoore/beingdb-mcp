@@ -64,6 +64,13 @@ arguments share no value, or a variable named after a different argument's decla
 role. The full list is in BeingDB's
 [diagnose documentation](https://github.com/jptmoore/beingdb/blob/main/docs/api.md#diagnose-dsl).
 
+When a constant occurs nowhere in its predicate (most often a misspelling), its
+diagnostic carries `evidence.suggestions`: up to five values of the same type that do
+occur at that argument, ranked by BeingDB, best first, and written as DSL literals.
+The message ends with `Did you mean <best>?`. For example,
+`created(Artist, work_aa)` gives `"suggestions": ["work_a", "work_b"]`. Suggestions
+are hints, not proofs: the LLM should use one only if it matches the question.
+
 `provablyEmpty: true` (some diagnostic has severity `error`) means the query as
 written cannot return rows. When BeingDB can prove a correction it also returns
 `repair.query` (the rewritten query) and `repair.applied` (the steps, such as
@@ -71,4 +78,19 @@ written cannot return rows. When BeingDB can prove a correction it also returns
 `beingdb-mcp` never applies it: the client decides whether to run `repair.query`.
 
 `beingdb_diagnose_query` needs a BeingDB with the `diagnose` action; older servers
-return an `unknown_action` tool error.
+return an `unknown_action` tool error. `evidence.suggestions` needs BeingDB 0.1.5 or
+later; older servers simply omit it.
+
+## Complete and incomplete results
+
+For DSL queries, `beingdb_query` results carry two flags from BeingDB:
+
+- `hasMore: true`: more rows match than were returned, because the query's own
+  `limit` or the server's row cap stopped it. Fetch the next page with `offset N`
+  in the query text.
+- `truncated: true`: the server's `max_results` cap, not the query's `limit`, cut
+  the result, and a `results_truncated` warning is added. The rows are not the
+  complete answer, so an LLM must not count or summarise them as if they were.
+
+Both need BeingDB 0.1.5 or later; older servers omit them. Core-language results
+use `total`/`offset`/`limit` instead.
