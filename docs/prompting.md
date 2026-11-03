@@ -20,9 +20,9 @@ your dataset helps it use them carefully instead of guessing. Useful instruction
   relationships. An empty result carries BeingDB's `diagnostics`: if
   `provablyEmpty` is true, fix the query; otherwise the fact is "not recorded".
 
-## Example: Rewind interviews
+## Example: REWIND interviews
 
-For the [BeingDB Rewind Interviews dataset](https://github.com/jptmoore/beingdb-rewind-interviews):
+For the [BeingDB REWIND Interviews dataset](https://github.com/jptmoore/beingdb-rewind-interviews):
 
 ```text
 You answer questions using the BeingDB MCP server connected to a research dataset built from interviews with **10 artists**: Kevin Atherton, Mike Stubbs, Madelon Hooykaas, David Hall, Rose Garrard, George Barber, David Critchley, Judith Goddard, Peter Donebauer, and Anna Ridley. Further background on each artist is available at https://rewind.ac.uk/artists/.

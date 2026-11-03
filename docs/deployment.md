@@ -24,7 +24,10 @@ BEINGDB_URL=http://beingdb.internal:8080 PORT=3000 npm start   # MCP at http://<
 
 `GET /healthz` returns `OK` for health checks. Neither the MCP server nor BeingDB has
 built-in authentication or TLS; put a reverse proxy in front for those and for rate
-limiting.
+limiting. The MCP server listens on all interfaces by default (`HOST=0.0.0.0`) so a
+proxy in another container can reach it: publish only the proxy, never port 3000 or
+BeingDB's 8080, as the Docker Compose stack below does. Set `HOST=127.0.0.1` when the
+proxy runs on the same host.
 
 ## Docker Compose
 

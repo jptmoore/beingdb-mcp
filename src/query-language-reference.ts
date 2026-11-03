@@ -3,7 +3,8 @@
  * language, served as the `beingdb://query-language` MCP resource.
  *
  * Deliberately short and not authoritative -- it summarizes syntax
- * documented in ~/git/beingdb/docs/query-language.md at the time this
+ * documented in BeingDB's docs/query-language.md
+ * (https://github.com/jptmoore/beingdb/blob/main/docs/query-language.md) at the time this
  * file was written. Always confirm against a live instance with
  * `beingdb_diagnose_query` / `beingdb_validate_query`, since predicates,
  * arities and argument types are dataset-specific and the DSL itself may

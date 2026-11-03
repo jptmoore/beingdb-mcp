@@ -12,7 +12,7 @@ to other machines or users.
 
 ## Quick start
 
-You need Node.js 18.17+ and a [BeingDB](https://github.com/jptmoore/beingdb) checkout
+You need Node.js 22+ and a [BeingDB](https://github.com/jptmoore/beingdb) checkout
 (with its OCaml tools, `opam` and `dune`) next to this repository:
 
 ```
@@ -137,7 +137,7 @@ See [docs/deployment.md](docs/deployment.md).
 ## Documentation
 
 - [docs/tools.md](docs/tools.md): tools, outputs, schema metadata, diagnostics and repairs
-- [docs/prompting.md](docs/prompting.md): prompting an LLM to use BeingDB carefully, including a Rewind example
+- [docs/prompting.md](docs/prompting.md): prompting an LLM to use BeingDB carefully, including a REWIND example
 - [docs/development.md](docs/development.md): local setup details, configuration, tests and troubleshooting
 - [docs/deployment.md](docs/deployment.md): hosting BeingDB and the MCP server
 
