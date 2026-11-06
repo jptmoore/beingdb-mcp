@@ -45,7 +45,9 @@ offset N
   averages, earliest and latest. \`sum\`/\`avg\` need integers or decimals (\`avg\` is a
   decimal); \`min\`/\`max\` also take years and dates and keep the value's type. Unlike
   \`count\`, they read each distinct combination of the query's named variables once, so
-  use \`_\` for arguments you do not need (an extra named variable can add a value twice).
+  name the thing you add up (\`duration(Work, Minutes)\`, not \`duration(_, Minutes)\`, which
+  adds equal values once and is warned as \`aggregate_wildcard\`), and use \`_\` only for
+  arguments that would otherwise repeat a solution.
   With no matches they are \`null\`. Misuse is rejected as \`invalid_aggregate\`.
 - \`where\` lists clauses: predicate patterns (\`created(Artist, Work)\`), comparisons
   (\`Year >= 1970\`, \`Date between @2019-01-01 and @2019-12-31\`), or \`_\` wildcards.

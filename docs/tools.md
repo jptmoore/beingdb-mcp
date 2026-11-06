@@ -137,8 +137,10 @@ where
 
 `sum`/`avg` need integers or decimals (`avg` is a decimal); `min`/`max` also take
 years and dates and keep the value's type. They read each distinct combination of
-the query's named variables once, so use `_` for arguments the question does not
-need. Misuse is rejected with `invalid_aggregate`; a sum too large for a 64-bit
+the query's named variables once, so name the thing being added up:
+`duration(Work, Minutes)`, not `duration(_, Minutes)`, which adds two equal values
+once (BeingDB warns with `aggregate_wildcard`). Use `_` only for arguments that would
+otherwise repeat a solution. Misuse is rejected with `invalid_aggregate`; a sum too large for a 64-bit
 number fails with `aggregate_overflow`.
 
 ## Resolving names
