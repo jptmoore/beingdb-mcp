@@ -52,6 +52,23 @@ export const diagnoseInputShape = {
   query: queryText,
 };
 
+export const resolveInputShape = {
+  text: z
+    .string()
+    .min(1)
+    .max(2000)
+    .describe("Free text that names things, e.g. the user's question: \"What did judith godard make at Oval House?\"."),
+  candidates: z.number().int().min(1).max(50).optional().describe("Candidates returned per mention (default 10)."),
+};
+
+export const aboutInputShape = {
+  value: z
+    .string()
+    .min(1)
+    .describe('One value in DSL literal syntax, usually a `literal` from `beingdb_resolve`: an atom `kevin_atherton`, a string `"Work A"`, a year `@1978`.'),
+  limit: z.number().int().min(1).max(100).optional().describe("Facts returned per predicate group (default 20)."),
+};
+
 export const getFactsInputShape = {
   predicate: z.string().min(1).describe("Exact predicate name, as returned by `beingdb_list_predicates` (e.g. \"created\")."),
 };
@@ -237,6 +254,68 @@ const getFactsOutputShape = {
   max_results: z.number().int().optional(),
 };
 
+const occurrence = z
+  .object({
+    predicate: z.string(),
+    position: z.number().int().describe("0-based argument position."),
+    role: z.string().optional().describe("Declared role of that argument, when the dataset declares one."),
+    semanticType: z.string().optional(),
+  })
+  .passthrough();
+
+const resolveCandidate = z
+  .object({
+    value: typedValue,
+    literal: z.string().describe("The value in DSL literal syntax, ready to use as a constant in a query."),
+    matchedName: z.string().describe("The name that matched: the value's own text, a label or an alias."),
+    match: z.string().describe("exact | label | alias | fuzzy | partial."),
+    label: z.string().optional().describe("The value's display label, when the dataset gives one."),
+    facts: z.number().int().describe("How many facts mention the value (label/alias facts excluded)."),
+    occurs: z.array(occurrence).describe("Every predicate argument holding the value."),
+  })
+  .passthrough();
+
+const resolveOutputShape = {
+  text: z.string(),
+  mentions: z
+    .array(
+      z
+        .object({
+          text: z.string().describe("The matched part of the text."),
+          start: z.number().int().describe("Byte offset of the mention in the text."),
+          end: z.number().int(),
+          match: z.string().describe("Best match kind among the candidates."),
+          candidateCount: z.number().int().describe("All candidates; more than one means the text is ambiguous."),
+          candidates: z.array(resolveCandidate),
+        })
+        .passthrough()
+    )
+    .describe("Mentions in text order. A name with no mention was not found in the data."),
+  ...environmentFields,
+};
+
+const aboutOutputShape = {
+  value: typedValue,
+  literal: z.string(),
+  label: z.string().optional(),
+  aliases: z.array(z.string()),
+  facts: z.number().int().describe("Distinct facts the value occurs in; 0 when it occurs nowhere."),
+  predicates: z.array(
+    z
+      .object({
+        predicate: z.string(),
+        position: z.number().int().describe("The value's 0-based argument position in these facts."),
+        description: z.string().optional(),
+        roles: z.array(z.string()).nullable().describe("Declared argument roles, or null when not all declared."),
+        count: z.number().int(),
+        facts: z.array(fact),
+        hasMore: z.boolean().describe("More facts than `limit` in this group."),
+      })
+      .passthrough()
+  ),
+  ...environmentFields,
+};
+
 const statusOutputShape = {
   reachable: z.boolean(),
   url: z.string(),
@@ -256,3 +335,5 @@ export const explainOutputSchema = outputSchema(explainOutputShape);
 export const diagnoseOutputSchema = outputSchema(diagnoseOutputShape);
 export const getFactsOutputSchema = outputSchema(getFactsOutputShape);
 export const statusOutputSchema = outputSchema(statusOutputShape);
+export const resolveOutputSchema = outputSchema(resolveOutputShape);
+export const aboutOutputSchema = outputSchema(aboutOutputShape);

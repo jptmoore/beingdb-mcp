@@ -6,6 +6,9 @@ your dataset helps it use them carefully instead of guessing. Useful instruction
 - **Schema first.** Call `beingdb_list_predicates` with `detailed: true` (or `names`)
   when the schema is unknown or the environment fingerprint has changed, and never
   invent predicate names. Declared descriptions and argument roles are authoritative.
+- **Resolve names, don't guess them.** Call `beingdb_resolve` with the question and
+  use the returned `literal`s as constants. Ask (or use context) when a name has
+  several candidates.
 - **DSL shape.** The DSL is line-oriented: a `find` line, a `where` line, then one
   pattern or comparison per line. Name variables after the declared roles.
 - **Diagnose before executing** non-trivial queries. `provablyEmpty: true` means the
@@ -13,7 +16,8 @@ your dataset helps it use them carefully instead of guessing. Useful instruction
   `evidence.suggestions` on a diagnostic lists likely corrections for a misspelled
   constant; these are hints, so check them against the question.
 - **Complete answers only.** Answer "how many" with `count(Var)` in the query
-  (distinct values, optionally per group). If a result has
+  (distinct values, optionally per group), and totals, averages, earliest and
+  latest with `sum`, `avg`, `min` and `max`. If a result has
   `truncated: true`, the rows are not everything; page with `offset` or narrow the
   query before summarising.
 - **Provenance.** Answer only from returned facts and don't infer unrecorded
@@ -35,7 +39,7 @@ The DSL is line-oriented: a `find Var, Var, ...` line followed by a `where` line
 
 Check non-trivial queries, or any query whose syntax or types are uncertain, with `beingdb_diagnose_query` before running them with `beingdb_query`; execute simple queries directly. Its diagnostics come from BeingDB, not guesswork. If it reports `provablyEmpty: true`, the query as written cannot match: fix it rather than concluding the fact is missing. If it returns a `repair`, BeingDB has proven that correction; use `repair.query` when it still matches the question. If a diagnostic lists `evidence.suggestions` for a misspelled name, use the suggestion that matches the question. If a result has `truncated: true`, it is incomplete: page with `offset` or narrow the query before counting or summarising.
 
-For "how many" questions, count in the query with `count(Var)` (for example `find Artist, count(Work)`) rather than counting returned rows. If you don't know an entity's exact atom, find it with `contains` (for example `Title contains "video"`) before using it. Use typed literals correctly: years use `@YYYY`, for example `@1975`. Prefer joins across explicit facts over inference. Never invent facts, infer relationships not represented in the data, or merge similarly named entities without evidence. An empty result from a valid query comes with BeingDB's diagnostics: if `provablyEmpty` is true, the query is wrong (for example a misspelled name or a date outside the stored range), so fix it; otherwise the fact isn't recorded, which does not mean the relationship is false -- phrase answers accordingly.
+For "how many" questions, count in the query with `count(Var)` (for example `find Artist, count(Work)`) rather than counting returned rows; for earliest, latest, totals and averages use `min`, `max`, `sum` and `avg` the same way. Before writing a query, call `beingdb_resolve` with the question to get the exact atoms for the people, works and places it names; if a name has several candidates, use the context or ask. If a name is not resolved, find it with `contains` (for example `Title contains "video"`) before using it. Use typed literals correctly: years use `@YYYY`, for example `@1975`. Prefer joins across explicit facts over inference. Never invent facts, infer relationships not represented in the data, or merge similarly named entities without evidence. An empty result from a valid query comes with BeingDB's diagnostics: if `provablyEmpty` is true, the query is wrong (for example a misspelled name or a date outside the stored range), so fix it; otherwise the fact isn't recorded, which does not mean the relationship is false -- phrase answers accordingly.
 
 Treat the dataset as a research artifact derived from interview material, not as independently verified catalogue metadata. Convert atom IDs such as `kevin_atherton` into readable English such as “Kevin Atherton”.
 

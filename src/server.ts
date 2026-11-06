@@ -14,6 +14,8 @@ import type { BeingDbClient } from "./beingdb-client.js";
 import { BeingDbError } from "./types.js";
 import type { QueryOutcome } from "./types.js";
 import {
+  aboutInputShape,
+  aboutOutputSchema,
   diagnoseInputShape,
   diagnoseOutputSchema,
   executeOutputSchema,
@@ -23,13 +25,15 @@ import {
   listPredicatesInputShape,
   listPredicatesOutputSchema,
   queryInputShape,
+  resolveInputShape,
+  resolveOutputSchema,
   statusOutputSchema,
   validateOrExplainInputShape,
   validateOutputSchema,
 } from "./schemas.js";
 import { QUERY_LANGUAGE_REFERENCE } from "./query-language-reference.js";
 
-export const SERVER_VERSION = "0.7.0";
+export const SERVER_VERSION = "0.8.0";
 
 /**
  * Every tool returns BeingDB's JSON both as `structuredContent` (validated
@@ -120,7 +124,7 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
     {
       title: "Execute a BeingDB query",
       description:
-        'Execute a BeingDB find/where query and return typed, structured rows. Use only predicates discovered with `beingdb_list_predicates`. To find something by part of its name or title, use `Var contains "text"` (case-insensitive substring). Normally execute a query only once it is valid: for non-trivial generated DSL, check it first with `beingdb_diagnose_query` (or `beingdb_validate_query`). An invalid query returns `valid: false` with structured `errors` instead of rows. For "how many" questions use `count(Var)` in `find` (e.g. `find Artist, count(Work)` counts distinct works per artist; `find count(Work)` gives one overall count); `total` is the number of result rows the query matches, which a join can duplicate. `hasMore: true` means more rows match than were returned (fetch them with `offset` in the query text), and `truncated: true` means the server\'s row cap cut the result: the rows are then not the complete answer, so never count or summarise them as if they were. When a query returns no rows, the response also explains why with BeingDB\'s `diagnostics` and `provablyEmpty` (and any proven `repair`), as `beingdb_diagnose_query` would: `provablyEmpty: true` means fix the query (e.g. a misspelled constant, or a comparison outside the stored values); `false` means the facts are not recorded. The exact submitted query is returned with the results and may be shown to the user for transparency.',
+        'Execute a BeingDB find/where query and return typed, structured rows. Use only predicates discovered with `beingdb_list_predicates`, and constants (names of people, places, works) found with `beingdb_resolve` rather than guessed. To find something by part of its name or title, use `Var contains "text"` (case-insensitive substring). Normally execute a query only once it is valid: for non-trivial generated DSL, check it first with `beingdb_diagnose_query` (or `beingdb_validate_query`). An invalid query returns `valid: false` with structured `errors` instead of rows. For "how many" questions use `count(Var)` in `find` (e.g. `find Artist, count(Work)` counts distinct works per artist; `find count(Work)` gives one overall count); For totals, averages, earliest and latest use `sum(Var)`, `avg(Var)`, `min(Var)` and `max(Var)` the same way (`sum`/`avg` need integers or decimals; `min`/`max` also take years and dates; they read each distinct combination of the query\'s named variables once, so use `_` for arguments you do not need). `total` is the number of result rows the query matches, which a join can duplicate. `hasMore: true` means more rows match than were returned (fetch them with `offset` in the query text), and `truncated: true` means the server\'s row cap cut the result: the rows are then not the complete answer, so never count or summarise them as if they were. When a query returns no rows, the response also explains why with BeingDB\'s `diagnostics` and `provablyEmpty` (and any proven `repair`), as `beingdb_diagnose_query` would: `provablyEmpty: true` means fix the query (e.g. a misspelled constant, or a comparison outside the stored values); `false` means the facts are not recorded. The exact submitted query is returned with the results and may be shown to the user for transparency.',
       inputSchema: queryInputShape,
       outputSchema: executeOutputSchema,
     },
@@ -185,6 +189,42 @@ export function createBeingDbMcpServer(client: BeingDbClient): McpServer {
       try {
         const outcome = await client.runQuery({ query: args.query, action: "explain" });
         return buildQueryToolResult(outcome, args.query);
+      } catch (err) {
+        return toolErrorResult(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "beingdb_resolve",
+    {
+      title: "Resolve names to BeingDB values",
+      description:
+        "Find the stored values a piece of text mentions, before writing a query. Pass the user's question (or any text): for each name it mentions, BeingDB returns the exact values in the data -- `literal` is the value in DSL syntax, ready to use as a query constant -- with how it matched (`exact`; `label` or `alias`, from the dataset's label/alias facts; `fuzzy`, a small misspelling; `partial`, part of a longer name such as a surname), where the value occurs (`occurs`: predicate, 0-based argument position and any declared role) and how many facts mention it. Several candidates mean the name is ambiguous: use the question's context or ask the user, never pick silently. A name with no mention is not in the data under that spelling; try `Var contains \"text\"` in a query instead. Matching is deterministic and done by BeingDB, not guessed.",
+      inputSchema: resolveInputShape,
+      outputSchema: resolveOutputSchema,
+    },
+    async (args): Promise<CallToolResult> => {
+      try {
+        return jsonResult(await client.resolve(args.text, args.candidates));
+      } catch (err) {
+        return toolErrorResult(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "beingdb_about",
+    {
+      title: "Everything about one BeingDB value",
+      description:
+        "List every fact a single value occurs in, grouped by predicate and argument position, with each predicate's declared description and argument roles, plus the value's `label` and `aliases`. Use it to see what the data holds about a person, place or thing -- e.g. a `literal` from `beingdb_resolve` -- before choosing predicates for a query, or to answer \"tell me about X\". `value` is one DSL literal (`kevin_atherton`, `\"Work A\"`, `@1978`). `facts: 0` means the value occurs nowhere; `hasMore: true` marks a group cut at `limit`.",
+      inputSchema: aboutInputShape,
+      outputSchema: aboutOutputSchema,
+    },
+    async (args): Promise<CallToolResult> => {
+      try {
+        return jsonResult(await client.about(args.value, args.limit));
       } catch (err) {
         return toolErrorResult(err);
       }

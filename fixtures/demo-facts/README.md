@@ -16,7 +16,8 @@ Facts (`created`, `work_shown_in` and `studied_at` also carry BeingDB
 `%!` declarations -- full roles and semantic types, roles only, and a
 description only -- while `artist` and `funded_by` are left undeclared,
 so tests can check that MCP passes declared metadata through and
-fabricates none):
+fabricates none; `year_created` gives aggregates something to add up, and
+`label` gives two values display names for `beingdb_resolve`/`beingdb_about`):
 
 ```
 artist(kevin_atherton).
@@ -31,6 +32,12 @@ work_shown_in(work_b, exhibition_b).
 studied_at(kevin_atherton, institution_a).
 
 funded_by(kevin_atherton, arts_council).
+
+year_created(work_a, @1978).
+year_created(work_b, @1971).
+
+label(kevin_atherton, "Kevin Atherton").
+label(work_a, "Prototype for a Mirror").
 ```
 
 The integration tests compile it into a temporary pack with BeingDB's own

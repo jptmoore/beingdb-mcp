@@ -77,6 +77,62 @@ export interface FactsResponse {
   max_results?: number;
 }
 
+/** One place a resolved value occurs: predicate, argument position and any declared role/semantic type. */
+export interface ValueOccurrence {
+  predicate: string;
+  position: number;
+  role?: string;
+  semanticType?: string;
+}
+
+/** A stored value a piece of text may refer to (`GET /resolve`). */
+export interface ResolveCandidate {
+  value: BeingDbTypedValue;
+  literal: string;
+  matchedName: string;
+  match: string;
+  label?: string;
+  facts: number;
+  occurs: ValueOccurrence[];
+}
+
+export interface ResolveMention {
+  text: string;
+  start: number;
+  end: number;
+  match: string;
+  candidateCount: number;
+  candidates: ResolveCandidate[];
+}
+
+/** `GET /resolve` -- the stored values a text mentions. */
+export interface ResolveResponse {
+  text: string;
+  mentions: ResolveMention[];
+  languageVersion?: string;
+  environmentFingerprint?: string;
+}
+
+/** `GET /about` -- every fact a value occurs in, grouped by predicate and position. */
+export interface AboutResponse {
+  value: BeingDbTypedValue;
+  literal: string;
+  label?: string;
+  aliases: string[];
+  facts: number;
+  predicates: Array<{
+    predicate: string;
+    position: number;
+    description?: string;
+    roles: string[] | null;
+    count: number;
+    facts: BeingDbTypedValue[][];
+    hasMore: boolean;
+  }>;
+  languageVersion?: string;
+  environmentFingerprint?: string;
+}
+
 /** A structured, query-invalid error (unknown_predicate, arity_mismatch, ...). */
 export interface BeingDbValidationError {
   code: string;

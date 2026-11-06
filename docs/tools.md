@@ -11,6 +11,8 @@ repairs all come from BeingDB; the MCP server never derives or rewrites them.
 | `beingdb_validate_query` | `POST /query` (`validate`) | Structural validation only |
 | `beingdb_explain_query` | `POST /query` (`explain`) | Show the access plan |
 | `beingdb_query` | `POST /query` (`execute`) | Run a query and get typed rows |
+| `beingdb_resolve` | `GET /resolve` | Turn the names in a question into the exact stored values (`literal`), with misspellings, labels, aliases and ambiguity reported |
+| `beingdb_about` | `GET /about` | List every fact one value occurs in, grouped by predicate, with its label and aliases |
 | `beingdb_get_facts` | `GET /query/:predicate` | Dump one predicate's facts |
 | `beingdb_status` | `GET /`, `GET /version` | Check connectivity and versions |
 
@@ -32,6 +34,7 @@ connection failures, timeouts and BeingDB rejecting the request.
 
 ```
 beingdb_list_predicates {detailed: true}  -> pick predicates by description and argument roles
+  -> beingdb_resolve {text: question}     -> exact constants for the names it mentions
   -> write a DSL query
   -> beingdb_diagnose_query               -> read diagnostics; optionally take repair.query
   -> beingdb_query                        -> typed rows
@@ -118,6 +121,56 @@ Each row has the group's values and a `count(Work)` column of type `integer`;
 carries the same `diagnostics` and `provablyEmpty` as an empty result, so a
 misspelled name is reported rather than answered as "0". Misuse, such as counting a
 variable that is also a `find` column, is rejected with `invalid_count`.
+
+## Sums, averages, minimum and maximum
+
+From BeingDB 0.5.0, `sum(Var)`, `avg(Var)`, `min(Var)` and `max(Var)` work like
+`count(Var)`: the other `find` variables are the groups, and the column is named
+after the call.
+
+```
+find Artist, min(Year), max(Year)
+where
+  created_by(Work, Artist)
+  year_created(Work, Year)
+```
+
+`sum`/`avg` need integers or decimals (`avg` is a decimal); `min`/`max` also take
+years and dates and keep the value's type. They read each distinct combination of
+the query's named variables once, so use `_` for arguments the question does not
+need. Misuse is rejected with `invalid_aggregate`; a sum too large for a 64-bit
+number fails with `aggregate_overflow`.
+
+## Resolving names
+
+From BeingDB 0.5.0, `beingdb_resolve` takes free text, usually the user's
+question, and returns each name it mentions with the stored values it may refer to:
+
+```json
+{
+  "text": "What did kevin athertn make?",
+  "mentions": [
+    {
+      "text": "kevin athertn", "match": "fuzzy", "candidateCount": 1,
+      "candidates": [
+        { "literal": "kevin_atherton", "label": "Kevin Atherton", "match": "fuzzy", "facts": 4,
+          "occurs": [
+            { "predicate": "artist", "position": 0 },
+            { "predicate": "created", "position": 0, "role": "Artist", "semanticType": "person" },
+            "..."
+          ] }
+      ]
+    }
+  ]
+}
+```
+
+`literal` is ready to use as a constant. `match` is `exact`, `label`, `alias`
+(from the dataset's `label(Thing, Name)` / `alias(Thing, Name)` facts), `fuzzy` (a
+small misspelling) or `partial` (part of a longer name, such as a surname).
+More than one candidate means the name is ambiguous; a name with no mention is not
+stored under that spelling. `beingdb_about` then lists everything about one value.
+Both are lookups, not queries: BeingDB does the matching deterministically.
 
 ## Text search
 
