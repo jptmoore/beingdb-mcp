@@ -44,11 +44,13 @@ describe("beingdb-mcp server", () => {
     const names = tools.map((t) => t.name).sort();
 
     expect(names).toEqual([
+      "beingdb_about",
       "beingdb_diagnose_query",
       "beingdb_explain_query",
       "beingdb_get_facts",
       "beingdb_list_predicates",
       "beingdb_query",
+      "beingdb_resolve",
       "beingdb_status",
       "beingdb_validate_query",
     ]);
@@ -221,6 +223,85 @@ describe("beingdb-mcp server", () => {
     expect(result.isError).toBe(true);
     const body = parseToolText(result as never) as { error: { code: string } };
     expect(body.error.code).toBe("invalid_request");
+  });
+
+  describe("value lookup", () => {
+    const resolveBody = {
+      text: "What did Kevin Athertn make?",
+      mentions: [
+        {
+          text: "Kevin Athertn",
+          start: 9,
+          end: 22,
+          match: "fuzzy",
+          candidateCount: 1,
+          candidates: [
+            {
+              value: { type: "atom", value: "kevin_atherton" },
+              literal: "kevin_atherton",
+              matchedName: "Kevin Atherton",
+              match: "fuzzy",
+              label: "Kevin Atherton",
+              facts: 3,
+              occurs: [{ predicate: "created", position: 0, role: "Artist", semanticType: "person" }],
+            },
+          ],
+        },
+      ],
+      languageVersion: "beingdb-dsl/1",
+      environmentFingerprint: "sha256:abc",
+    };
+
+    it("forwards beingdb_resolve to GET /resolve and returns BeingDB's mentions verbatim", async () => {
+      fetchMock.mockResolvedValueOnce(fakeResponse(200, resolveBody));
+      const result = await client.callTool({ name: "beingdb_resolve", arguments: { text: resolveBody.text, candidates: 3 } });
+      expect(result.isError).toBeFalsy();
+      expect(result.structuredContent).toEqual(resolveBody);
+      const url = new URL(fetchMock.mock.calls[0]![0] as string);
+      expect(url.pathname).toBe("/resolve");
+      expect(url.searchParams.get("text")).toBe(resolveBody.text);
+      expect(url.searchParams.get("candidates")).toBe("3");
+    });
+
+    it("forwards beingdb_about to GET /about, omitting an unset limit", async () => {
+      const body = {
+        value: { type: "atom", value: "kevin_atherton" },
+        literal: "kevin_atherton",
+        label: "Kevin Atherton",
+        aliases: [],
+        facts: 1,
+        predicates: [
+          {
+            predicate: "created",
+            position: 0,
+            roles: ["Artist", "Work"],
+            count: 1,
+            facts: [[{ type: "atom", value: "kevin_atherton" }, { type: "atom", value: "work_a" }]],
+            hasMore: false,
+          },
+        ],
+      };
+      fetchMock.mockResolvedValueOnce(fakeResponse(200, body));
+      const result = await client.callTool({ name: "beingdb_about", arguments: { value: "kevin_atherton" } });
+      expect(result.isError).toBeFalsy();
+      expect(result.structuredContent).toEqual(body);
+      const url = new URL(fetchMock.mock.calls[0]![0] as string);
+      expect(url.pathname).toBe("/about");
+      expect(url.searchParams.get("value")).toBe("kevin_atherton");
+      expect(url.searchParams.has("limit")).toBe(false);
+    });
+
+    it("surfaces BeingDB's lookup errors (e.g. invalid_value, or 404 from an older BeingDB) as tool errors", async () => {
+      fetchMock.mockResolvedValueOnce(fakeResponse(400, { error: { code: "invalid_value", message: "Invalid value" } }));
+      const invalid = await client.callTool({ name: "beingdb_about", arguments: { value: "two values" } });
+      expect(invalid.isError).toBe(true);
+      expect((parseToolText(invalid as never) as { error: { code: string } }).error.code).toBe("invalid_value");
+
+      fetchMock.mockResolvedValueOnce(fakeResponse(404, {}));
+      const missing = await client.callTool({ name: "beingdb_resolve", arguments: { text: "Kevin" } });
+      expect(missing.isError).toBe(true);
+      expect((parseToolText(missing as never) as { error: { status: number } }).error.status).toBe(404);
+    });
   });
 
   describe("predicate introspection", () => {

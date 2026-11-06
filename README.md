@@ -77,6 +77,8 @@ using this workspace configuration to avoid having two `beingdb` servers configu
 ## What it provides
 
 - `beingdb_list_predicates`: discover the schema
+- `beingdb_resolve`: find the stored values the names in a question refer to
+- `beingdb_about`: list everything about one value
 - `beingdb_diagnose_query`: check a query and get diagnostics and proven repairs
 - `beingdb_query`: execute a query
 - `beingdb_validate_query`: validate a query
@@ -88,6 +90,8 @@ A typical session:
 
 ```
 discover schema
+  ↓
+resolve the names in the question
   ↓
 write query
   ↓

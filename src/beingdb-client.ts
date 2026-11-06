@@ -7,6 +7,7 @@
  */
 import { debugLog } from "./log.js";
 import type {
+  AboutResponse,
   BeingDbSuccessBody,
   FactsResponse,
   PredicatesDetailedResponse,
@@ -16,6 +17,7 @@ import type {
   QueryInvalidResult,
   QueryLanguage,
   QueryOutcome,
+  ResolveResponse,
   VersionInfo,
 } from "./types.js";
 import { BeingDbError } from "./types.js";
@@ -140,6 +142,33 @@ export class BeingDbClient {
     const { status, json } = await this.requestRaw("GET", `/query/${encodeURIComponent(predicate)}`);
     if (status >= 400) throw this.toError(status, json);
     return json as FactsResponse;
+  }
+
+  /**
+   * `GET /resolve` -- the stored values a text mentions (exact, label,
+   * alias, fuzzy or partial matches), with up to `candidates` candidates
+   * each. Throws {@link BeingDbError} for BeingDB's errors (e.g.
+   * `text_too_long`, or `404` from a BeingDB without this endpoint).
+   */
+  async resolve(text: string, candidates?: number): Promise<ResolveResponse> {
+    const params = new URLSearchParams({ text });
+    if (candidates !== undefined) params.set("candidates", String(candidates));
+    const { status, json } = await this.requestRaw("GET", `/resolve?${params.toString()}`);
+    if (status >= 400) throw this.toError(status, json);
+    return json as ResolveResponse;
+  }
+
+  /**
+   * `GET /about` -- every fact a value (one DSL literal, e.g.
+   * `kevin_atherton` or `"Work A"`) occurs in, at most `limit` per group.
+   * Throws {@link BeingDbError} for BeingDB's errors (e.g. `invalid_value`).
+   */
+  async about(value: string, limit?: number): Promise<AboutResponse> {
+    const params = new URLSearchParams({ value });
+    if (limit !== undefined) params.set("limit", String(limit));
+    const { status, json } = await this.requestRaw("GET", `/about?${params.toString()}`);
+    if (status >= 400) throw this.toError(status, json);
+    return json as AboutResponse;
   }
 
   /**

@@ -18,7 +18,7 @@ projection, optional matches, disjunction, negation, ordering,
 deduplication and pagination.
 
 \`\`\`
-find [distinct] Var | count(Var), ...
+find [distinct] Var | count(Var) | sum(Var) | avg(Var) | min(Var) | max(Var), ...
 where
   <clause>
   <clause>
@@ -30,7 +30,7 @@ where
     <clause>*
   not
     <clause>*
-order by Var | count(Var) [ascending|descending], ...
+order by Var | <aggregate>(Var) [ascending|descending], ...
 limit N
 offset N
 \`\`\`
@@ -41,6 +41,12 @@ offset N
   E.g. \`find Artist, count(Work)\` ... \`order by count(Work) descending\`. The
   column (and result key) is \`count(Work)\`; values unbound by \`optional\` are not
   counted, so a group can count 0. Use it for "how many" questions.
+- \`sum(Var)\`, \`avg(Var)\`, \`min(Var)\` and \`max(Var)\` group the same way, for totals,
+  averages, earliest and latest. \`sum\`/\`avg\` need integers or decimals (\`avg\` is a
+  decimal); \`min\`/\`max\` also take years and dates and keep the value's type. Unlike
+  \`count\`, they read each distinct combination of the query's named variables once, so
+  use \`_\` for arguments you do not need (an extra named variable can add a value twice).
+  With no matches they are \`null\`. Misuse is rejected as \`invalid_aggregate\`.
 - \`where\` lists clauses: predicate patterns (\`created(Artist, Work)\`), comparisons
   (\`Year >= 1970\`, \`Date between @2019-01-01 and @2019-12-31\`), or \`_\` wildcards.
 - \`optional\` is a left join -- variables only bound inside it come back as \`null\`
@@ -87,6 +93,12 @@ plain substring test (no wildcards or regular expressions); the text must be quo
 1-200 characters. Use it to find entities whose exact atom you don't know, then use
 that atom.
 
+## Names: label and alias
+
+A dataset may give values display names with \`label(Thing, Name)\` and other names or
+spellings with \`alias(Thing, Name)\`. They are ordinary facts you can query, and
+\`beingdb_resolve\` matches them too.
+
 ## Example
 
 \`\`\`
@@ -107,15 +119,21 @@ limit 20
 1. \`beingdb_list_predicates\` (\`detailed: true\` or \`names\`) to discover real predicate
    names, arities, argument types and any declared descriptions and argument roles.
    Argument \`position\`s are 0-based; declared roles give each argument's meaning.
-2. Construct DSL using only predicates that were actually discovered.
-3. \`beingdb_diagnose_query\` before executing non-trivial queries: validation plus
+2. \`beingdb_resolve\` with the user's question to turn the names it mentions into the exact
+   stored values (\`literal\`), tolerating misspellings and using any labels or aliases.
+   Several candidates mean the name is ambiguous: use the context or ask. No mention means
+   the name is not stored under that spelling: try \`Var contains "text"\`.
+   \`beingdb_about\` shows every fact about one value, which helps choose predicates.
+3. Construct DSL using only predicates that were actually discovered, and constants from step 2.
+4. \`beingdb_diagnose_query\` before executing non-trivial queries: validation plus
    data-aware diagnostics (\`provablyEmpty\`, per-diagnostic \`code\`/\`severity\`/\`evidence\`)
    and, when BeingDB can prove one, a \`repair.query\` you may choose to run. A
    probably misspelled constant comes with \`evidence.suggestions\` (closest values that
    occur at that argument) -- hints, not proofs.
    (\`beingdb_validate_query\` checks structure only; \`beingdb_explain_query\` shows the plan.)
-4. \`beingdb_query\` to execute and get typed, structured rows. For "how many", use
-   \`count(Var)\` (distinct values, optionally per group); \`total\` is how many result
+5. \`beingdb_query\` to execute and get typed, structured rows. For "how many", use
+   \`count(Var)\` (distinct values, optionally per group); for totals and extremes
+   \`sum\`/\`avg\`/\`min\`/\`max\`; \`total\` is how many result
    rows the query matches, which a join can duplicate. \`hasMore: true\` means more
    rows match (page with \`offset\`); \`truncated: true\` means the server's row cap cut the
    result, so the rows are not the complete answer. An empty DSL result carries

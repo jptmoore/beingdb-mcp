@@ -58,13 +58,13 @@ afterAll(async () => {
 
 describe("server identity and status", () => {
   it("identifies itself with the package version", () => {
-    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.7.0" });
+    expect(client.getServerVersion()).toMatchObject({ name: "beingdb-mcp", version: "0.8.0" });
   });
 
   it("reports the local BeingDB as reachable, with version and fingerprint", async () => {
     const result = await call("beingdb_status");
     expect(result.isError).toBeFalsy();
-    expect(result.structuredContent).toMatchObject({ reachable: true, url: beingDbUrl, predicateCount: 5 });
+    expect(result.structuredContent).toMatchObject({ reachable: true, url: beingDbUrl, predicateCount: 7 });
     expect(result.structuredContent?.version).toBe((await native("/version")).version);
     expect(result.structuredContent?.environmentFingerprint).toMatch(FINGERPRINT);
   });
@@ -322,6 +322,53 @@ describe("execute", () => {
     const result = await call("beingdb_validate_query", { query: dslQuery });
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent).toMatchObject({ query: dslQuery, valid: false, errors: [{ code: "unknown_predicate" }] });
+  });
+});
+
+describe("value lookup", () => {
+  it("resolves names in a question, including a misspelling and a label, exactly as BeingDB's GET /resolve", async () => {
+    const text = "Was Prototype for a Mirror made by kevin athertn?";
+    const result = await call("beingdb_resolve", { text });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual(await native(`/resolve?${new URLSearchParams({ text })}`));
+    expect(result.structuredContent).toMatchObject({
+      mentions: [
+        { text: "Prototype for a Mirror", match: "label", candidates: [{ literal: "work_a", label: "Prototype for a Mirror" }] },
+        { text: "kevin athertn", match: "fuzzy", candidates: [{ literal: "kevin_atherton", label: "Kevin Atherton" }] },
+      ],
+      environmentFingerprint: expect.stringMatching(FINGERPRINT),
+    });
+  });
+
+  it("lists everything about a value exactly as BeingDB's GET /about, and reports a bad value as a tool error", async () => {
+    const result = await call("beingdb_about", { value: "work_a", limit: 5 });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual(await native("/about?value=work_a&limit=5"));
+    expect(result.structuredContent).toMatchObject({ literal: "work_a", label: "Prototype for a Mirror", facts: 3 });
+
+    const invalid = await call("beingdb_about", { value: "two values" });
+    expect(invalid.isError).toBe(true);
+    expect(parseToolJson(invalid)).toMatchObject({ error: { code: "invalid_value", status: 400 } });
+  });
+
+  it("aggregates with min/max, keeping the year type, and rejects sum over atoms with invalid_aggregate", async () => {
+    const dslQuery = "find count(Work), min(Year), max(Year)\nwhere\n  year_created(Work, Year)";
+    const result = await call("beingdb_query", { query: dslQuery });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toEqual({ query: dslQuery, ...(await native("/query", { language: "dsl", action: "execute", query: dslQuery })) });
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          "count(Work)": { type: "integer", value: "2" },
+          "min(Year)": { type: "year", value: "1971" },
+          "max(Year)": { type: "year", value: "1978" },
+        },
+      ],
+    });
+
+    const invalid = await call("beingdb_query", { query: "find sum(Artist)\nwhere\n  created(Artist, Work)" });
+    expect(invalid.isError).toBeFalsy();
+    expect(invalid.structuredContent).toMatchObject({ valid: false, errors: [{ code: "invalid_aggregate" }] });
   });
 });
 
